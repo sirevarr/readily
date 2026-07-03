@@ -655,6 +655,7 @@ function renderChatTab(){
     return;
   }
   const mc=state.chatMessages.length;
+  const ph = state.chatCitation ? `Preguntar sobre "${state.chatCitation.slice(0, 25).trim()}..."` : 'Pregunta…';
   b.innerHTML=`<div class="chat-panel">
     <div class="thread-bar">
       <select id="th-sel">${state.chatThreads.map(t=>`<option value="${t.id}" ${t.id===state.currentThreadId?'selected':''}>${esc(t.title)}</option>`).join('')}</select>
@@ -663,24 +664,16 @@ function renderChatTab(){
     </div>
     <div class="chat-header-bar"><span>${mc>0?mc+' msgs':'Vacío'}</span><div style="display:flex;gap:8px"><button class="chat-action-btn" id="ck-btn">Cambiar clave</button></div></div>
     <div class="chat-messages" id="cm">${mc===0?'<div class="chat-empty">Pregunta sobre el documento o selecciona texto y pulsa "✨ Explicar".</div>':''}${state.chatMessages.map(m=>`<div class="chat-msg ${m.role}">${esc(m.text)}</div>`).join('')}${state.chatBusy?'<div class="chat-msg model pending">Pensando…</div>':''}</div>
-    ${state.chatCitation ? `
-      <div id="chat-citation-badge" style="padding: 7px 10px; background: var(--accent-soft); border-top: 1px solid var(--line); font-size: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--accent);">
-        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">
-          📄 Cita: "<strong>${esc(state.chatCitation.length > 35 ? state.chatCitation.slice(0, 35) + '…' : state.chatCitation)}</strong>"
-        </span>
-        <button id="clear-citation-btn" style="background: none; border: none; font-size: 14px; cursor: pointer; color: var(--ink-soft); font-weight: bold; line-height: 1;">✕</button>
-      </div>
-    ` : ''}
-    <div class="chat-input-row"><textarea class="chat-textarea" id="ci" placeholder="Pregunta sobre la cita…" rows="1"></textarea><button class="chat-send-btn" id="cs" ${state.chatBusy?'disabled':''}>Enviar</button></div>
+    <div class="chat-input-row">
+      <textarea class="chat-textarea" id="ci" placeholder="${esc(ph)}" rows="1"></textarea>
+      <button class="chat-send-btn" id="cs" ${state.chatBusy?'disabled':''}>Enviar</button>
+    </div>
   </div>`;
   document.getElementById('cm').scrollTop=999999;
   document.getElementById('th-sel').onchange=async e=>{state.currentThreadId=e.target.value;await loadThreadMsgs(state.currentThreadId);renderChatTab()};
   document.getElementById('th-new').onclick=async()=>{const t=prompt('Nombre:',`Chat ${state.chatThreads.length+1}`);if(!t)return;const{data}=await state.sb.from('chat_threads').insert({document_id:state.currentDoc.id,title:t,user_id:state.session.user.id}).select().single();if(data){state.chatThreads.push(data);state.currentThreadId=data.id;state.chatMessages=[];renderChatTab()}};
   document.getElementById('th-del').onclick=async()=>{if(state.chatThreads.length<=1){alert('Necesitas al menos un chat.');return}if(!confirm('¿Eliminar este chat?'))return;await state.sb.from('chat_threads').delete().eq('id',state.currentThreadId);state.chatThreads=state.chatThreads.filter(t=>t.id!==state.currentThreadId);state.currentThreadId=state.chatThreads[0].id;await loadThreadMsgs(state.currentThreadId);renderChatTab()};
   document.getElementById('ck-btn').onclick=()=>{state.geminiKey='';localStorage.removeItem(GEMINI_KEY_LS);renderChatTab()};
-  if (state.chatCitation) {
-    document.getElementById('clear-citation-btn').onclick = () => { state.chatCitation = ''; renderChatTab(); };
-  }
   const inp=document.getElementById('ci');
   const send=()=>{const t=inp.value.trim();if(!t||state.chatBusy)return;inp.value='';sendChat(t)};
   document.getElementById('cs').onclick=send;
@@ -690,7 +683,7 @@ function renderChatTab(){
 async function sendChat(text){
   let promptText = text;
   if (state.chatCitation) {
-    promptText = `[Pregunta sobre esta cita del documento: "${state.chatCitation}"]\n\n${text}`;
+    promptText = `[El usuario hace esta pregunta con respecto a la siguiente cita del documento: "${state.chatCitation}"]\n\nPregunta: ${text}`;
     state.chatCitation = '';
   }
   state.chatMessages.push({role:'user',text});state.chatBusy=true;renderChatTab();
@@ -720,8 +713,27 @@ Reglas:
 - EVITA EL USO DE TEXTO EN NEGRITA (no utilices "**" para resaltar palabras bajo ningún concepto).
 - Cita la página cuando sea relevante.
 - Si algo no está definido en el documento, explícalo brevemente con tu conocimiento.`;
+
+  // Copiar el historial para enviar a Gemini
+  const history = state.chatMessages.slice(-MAX_CTX).map(m => ({
+    role: m.role === 'user' ? 'user' : 'model',
+    parts: [{ text: m.text }]
+  }));
+
+  // Inyectar el texto enriquecido (con la cita oculta) al final del historial
+  if (history.length > 0 && history[history.length - 1].role === 'user') {
+    history[history.length - 1].parts[0].text = userText;
+  }
+
   try{
-    const r=await fetch(`${GEMINI_API}?key=${state.geminiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({systemInstruction:{parts:[{text:sys}]},contents:state.chatMessages.slice(-MAX_CTX).map(m=>({role:m.role==='user'?'user':'model',parts:[{text:m.text}]}))})});
+    const r=await fetch(`${GEMINI_API}?key=${state.geminiKey}`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        systemInstruction:{parts:[{text:sys}]},
+        contents: history
+      })
+    });
     const d=await r.json();if(d.error)return`Error: ${d.error.message}`;
     return d.candidates?.[0]?.content?.parts?.map(p=>p.text).join('')||'Sin respuesta.';
   }catch(e){return`Error de conexión: ${e.message}`}
