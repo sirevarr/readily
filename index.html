@@ -786,20 +786,18 @@ async function triggerExplain(term, pageNum) {
   if (ti !== -1) { const s = Math.max(0, ti - 300), e = Math.min(pt.length, ti + term.length + 400); ctx = pt.slice(s, e); }
   else ctx = pt.slice(0, 800);
 
-  const prompt = `Explica de forma didáctica, clara y muy breve qué significa "${term}" en el contexto de la lectura "${state.currentDoc?.title || ''}".
+  const prompt = `Explica de forma didáctica, clara y súper breve (máximo 3-4 líneas en total) qué significa "${term}" en el contexto de la lectura "${state.currentDoc?.title || ''}".
 
 Contexto de la página ${pageNum}:
 "${ctx}"
 
 Instrucciones:
-1. Sé conciso y fácil de leer. No generes textos abrumadoramente largos.
-2. NO uses negrita (no utilices "**" para resaltar palabras).
-3. Empieza con una definición muy simple en una o dos líneas, fácil de entender.
-4. Da una analogía simple de la vida cotidiana.
-5. Explica brevemente por qué el autor usa este término en el libro.
-6. Da un ejemplo práctico corto.
+1. Sé extremadamente resumido. No escribas textos largos.
+2. NO uses negrita (evita "**").
+3. Da una definición de 1 oración directa.
+4. Da un ejemplo de 1 oración o una analogía corta.
 
-Responde de manera fluida y directa. No numeres las secciones ni uses formato JSON. Escribe con un tono cercano y didáctico.`;
+Responde en español de forma muy fluida y directa. Sin títulos, sin números y sin formato JSON. Texto ultra-conciso.`;
 
   try {
     const r = await fetch(`${GEMINI_API}?key=${state.geminiKey}`, {
@@ -827,6 +825,24 @@ function explainSelection() {
     renderToolbar(); renderSidebar(); return;
   }
   triggerExplain(text, pageNum);
+}
+
+function askAboutSelection() {
+  if (!pendingSelection) return;
+  const { text } = pendingSelection;
+  hideSelectionToolbar();
+  window.getSelection().removeAllRanges();
+  state.sidebarOpen = true; state.sidebarTab = 'chat';
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar) sidebar.classList.remove('hidden');
+  renderToolbar(); renderSidebar();
+  const inp = document.getElementById('ci');
+  if (inp) {
+    inp.value = `Sobre el fragmento "${text}": `;
+    inp.focus();
+    inp.selectionStart = inp.selectionEnd = inp.value.length;
+    inp.style.height = 'auto'; inp.style.height = inp.scrollHeight + 'px';
+  }
 }
 
 // ============================================================
@@ -923,13 +939,15 @@ function showSelectionToolbar(fr, pb) {
   let bar = document.getElementById('sel-tb');
   if (!bar) { bar = document.createElement('div'); bar.id = 'sel-tb'; bar.className = 'selection-toolbar'; document.getElementById('page-wrap').appendChild(bar); }
   bar.innerHTML = COLORS.map(c => `<div class="swatch-dot" data-c="${c.hex}" style="background:${c.hex}" title="${c.name}"></div>`).join('') +
-    `<div class="sel-divider"></div><button class="explain-btn" id="ex-btn">✨ Explicar</button>`;
+    `<div class="sel-divider"></div><button class="explain-btn" id="ex-btn">✨ Explicar</button><button class="explain-btn" id="ask-btn">💬 Preguntar</button>`;
   bar.style.left = (fr.left - pb.left + fr.width / 2) + 'px';
   bar.style.top = (fr.top - pb.top - 10) + 'px';
   bar.style.display = 'flex';
   bar.querySelectorAll('.swatch-dot').forEach(dot => { dot.onmousedown = e => e.stopPropagation(); dot.onclick = () => commitHL(dot.dataset.c); });
   document.getElementById('ex-btn').onmousedown = e => e.stopPropagation();
   document.getElementById('ex-btn').onclick = explainSelection;
+  document.getElementById('ask-btn').onmousedown = e => e.stopPropagation();
+  document.getElementById('ask-btn').onclick = askAboutSelection;
 }
 
 function hideSelectionToolbar() { const b = document.getElementById('sel-tb'); if (b) b.style.display = 'none'; pendingSelection = null; }
