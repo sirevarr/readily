@@ -695,17 +695,19 @@ function renderChatTab(){
 
 async function sendChat(text){
   let promptText = text;
+  let uiText = text;
   if (state.chatCitation) {
     promptText = `[El usuario hace esta pregunta con respecto a la siguiente cita del documento: "${state.chatCitation}"]\n\nPregunta: ${text}`;
+    uiText = `> "${state.chatCitation}"\n\n${text}`;
     state.chatCitation = '';
   }
-  state.chatMessages.push({role:'user',text});state.chatBusy=true;renderChatTab();
+  state.chatMessages.push({role:'user',text:uiText});state.chatBusy=true;renderChatTab();
   const reply=await askGemini(promptText);
   state.chatBusy=false;state.chatMessages.push({role:'model',text:reply});
   renderChatTab();
 
   const { error } = await state.sb.from('chat_messages').insert([
-    {document_id:state.currentDoc.id,thread_id:state.currentThreadId,role:'user',content:text,user_id:state.session.user.id},
+    {document_id:state.currentDoc.id,thread_id:state.currentThreadId,role:'user',content:uiText,user_id:state.session.user.id},
     {document_id:state.currentDoc.id,thread_id:state.currentThreadId,role:'model',content:reply,user_id:state.session.user.id},
   ]);
   if (error) {
