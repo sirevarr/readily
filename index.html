@@ -214,7 +214,20 @@
     .epf-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
     .epf-btn.primary:hover{background:var(--accent-h)}
     .epf-btn:disabled{opacity:.4;cursor:not-allowed}
-    @media(max-width:520px){.explain-panel{left:10px;right:10px;bottom:10px;width:auto}}
+    /* ---- POPUP DE PREGUNTA (aparece cerca de la selección) ---- */
+    .ask-popup{position:fixed;bottom:20px;right:20px;width:380px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 16px 60px rgba(0,0,0,.22);z-index:100;display:flex;flex-direction:column;animation:panelIn .2s ease;overflow:hidden}
+    .ask-popup-header{padding:12px 16px 10px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-shrink:0}
+    .ask-popup-cite{font-size:12px;color:var(--ink-soft);font-style:italic;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ask-popup-cite strong{color:var(--ink);font-style:normal}
+    .ask-popup-close{background:none;border:none;color:var(--ink-soft);cursor:pointer;font-size:16px;padding:0;line-height:1;flex-shrink:0}
+    .ask-popup-close:hover{color:var(--ink)}
+    .ask-popup-body{padding:12px 16px;display:flex;gap:8px;align-items:flex-end}
+    .ask-popup-input{flex:1;resize:none;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-family:var(--sans);font-size:13px;min-height:70px;max-height:140px;outline:none;line-height:1.5;color:var(--ink)}
+    .ask-popup-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(63,110,99,.1)}
+    .ask-popup-input::placeholder{color:var(--ink-soft)}
+    .ask-popup-send{background:var(--accent);color:#fff;border:none;border-radius:10px;width:38px;height:38px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .12s}
+    .ask-popup-send:hover{background:var(--accent-h)}
+    @media(max-width:520px){.ask-popup{left:10px;right:10px;width:auto}}
   </style>
 </head>
 <body>
@@ -861,17 +874,47 @@ function askAboutSelection() {
   const { text } = pendingSelection;
   hideSelectionToolbar();
   window.getSelection().removeAllRanges();
-  state.chatCitation = text;
-  state.sidebarOpen = true; state.sidebarTab = 'chat';
-  const sidebar = document.getElementById('sidebar');
-  if (sidebar) sidebar.classList.remove('hidden');
-  renderToolbar(); renderSidebar();
-  const inp = document.getElementById('ci');
-  if (inp) {
-    inp.value = '';
-    inp.focus();
-    inp.style.height = 'auto';
-  }
+
+  // Quitar popup anterior si existe
+  document.getElementById('ask-popup')?.remove();
+
+  const popup = document.createElement('div');
+  popup.id = 'ask-popup';
+  popup.className = 'ask-popup';
+  const preview = text.length > 40 ? text.slice(0, 40) + '…' : text;
+  popup.innerHTML = `
+    <div class="ask-popup-header">
+      <span class="ask-popup-cite">Sobre: <strong>"${esc(preview)}"</strong></span>
+      <button class="ask-popup-close" id="ask-popup-close">✕</button>
+    </div>
+    <div class="ask-popup-body">
+      <textarea class="ask-popup-input" id="ask-popup-input" placeholder="¿Qué quieres saber sobre este fragmento?" rows="3"></textarea>
+      <button class="ask-popup-send" id="ask-popup-send" title="Enviar">↑</button>
+    </div>`;
+  document.body.appendChild(popup);
+
+  const inp = document.getElementById('ask-popup-input');
+  inp.focus();
+
+  document.getElementById('ask-popup-close').onclick = () => popup.remove();
+
+  const doSend = () => {
+    const q = inp.value.trim();
+    if (!q) return;
+    popup.remove();
+    // Abrir sidebar en chat
+    state.sidebarOpen = true; state.sidebarTab = 'chat';
+    state.chatCitation = text;
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.classList.remove('hidden');
+    renderToolbar(); renderSidebar();
+    sendChat(q);
+  };
+
+  document.getElementById('ask-popup-send').onclick = doSend;
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); }
+  });
 }
 
 // ============================================================
