@@ -1,0 +1,691 @@
+<div id="app-root"></div>
+<style>
+  :root{
+    --paper:#F3EFE6; --ink:#262421; --ink-soft:#5B564E;
+    --spine:#201E1B; --spine-text:#F3EFE6; --accent:#3F6E63; --accent-soft:#DCE7E3;
+    --line:#DDD5C4; --sidebar-bg:#FBF9F4;
+    --serif: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  #app-root{ font-family: var(--sans); color: var(--ink); background: var(--paper); min-height:100vh; display:flex; flex-direction:column; }
+
+  /* ---- centered card screens (connect / login / library) ---- */
+  .screen{ flex:1; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:28px; width:100%; max-width:420px; box-shadow:0 8px 28px rgba(38,36,33,0.08); }
+  .card h1{ font-family:var(--serif); font-style:italic; font-weight:400; font-size:24px; margin:0 0 6px; }
+  .card p.hint{ color:var(--ink-soft); font-size:13px; margin:0 0 18px; line-height:1.5; }
+  .field{ margin-bottom:12px; }
+  .field label{ display:block; font-size:12px; color:var(--ink-soft); margin-bottom:4px; }
+  .field input{ width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-size:14px; font-family:var(--sans); }
+  .btn-primary{
+    width:100%; background:var(--accent); color:#fff; border:none; padding:11px; border-radius:8px;
+    font-size:14px; cursor:pointer; margin-top:4px;
+  }
+  .btn-link{ background:none; border:none; color:var(--accent); font-size:13px; cursor:pointer; padding:0; text-decoration:underline; margin-top:12px; }
+  .error-msg{ color:#B4433A; font-size:13px; margin-top:8px; }
+  .ok-msg{ color:var(--accent); font-size:13px; margin-top:8px; }
+
+  /* ---- library ---- */
+  .library-wrap{ flex:1; padding:32px 20px; max-width:720px; margin:0 auto; width:100%; }
+  .library-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+  .library-header h1{ font-family:var(--serif); font-style:italic; font-weight:400; font-size:26px; margin:0; }
+  .upload-btn{ background:var(--accent); color:#fff; border:none; padding:9px 16px; border-radius:999px; font-size:13px; cursor:pointer; }
+  .upload-btn input{ display:none; }
+  .doc-list{ display:flex; flex-direction:column; gap:10px; }
+  .doc-item{
+    display:flex; justify-content:space-between; align-items:center; background:#fff; border:1px solid var(--line);
+    border-radius:10px; padding:14px 16px; cursor:pointer;
+  }
+  .doc-item:hover{ background: var(--accent-soft); }
+  .doc-title{ font-size:14px; }
+  .doc-meta{ font-size:12px; color:var(--ink-soft); }
+  .empty-lib{ color:var(--ink-soft); font-size:14px; text-align:center; padding:40px 0; }
+  .logout-link{ background:none; border:none; color:var(--ink-soft); font-size:12px; cursor:pointer; text-decoration:underline; }
+
+  /* ---- toolbar ---- */
+  .spine{ background:var(--spine); color:var(--spine-text); display:flex; align-items:center; gap:14px; padding:10px 16px; flex-wrap:wrap; position:sticky; top:0; z-index:20; }
+  .brand{ font-family:var(--serif); font-style:italic; font-size:18px; margin-right:6px; white-space:nowrap; cursor:pointer; }
+  .spine button{
+    background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.18); color:var(--spine-text);
+    padding:7px 12px; border-radius:999px; font-size:13px; cursor:pointer;
+  }
+  .spine button:hover{ background:rgba(255,255,255,0.18); }
+  .spine button:disabled{ opacity:0.35; cursor:not-allowed; }
+  .pagectl{ display:flex; align-items:center; gap:6px; font-size:13px; }
+  .pagectl input{ width:46px; text-align:center; padding:5px; border-radius:6px; border:1px solid rgba(255,255,255,0.25); background:rgba(255,255,255,0.08); color:var(--spine-text); }
+  .spacer{ flex:1; }
+  .sync-dot{ width:7px; height:7px; border-radius:50%; background:#7FAE8C; opacity:0.9; }
+  .sync-dot.saving{ background:#E9B949; }
+
+  /* ---- reader ---- */
+  .workspace{ flex:1; display:flex; min-height:0; }
+  .stage{ flex:1; overflow:auto; display:flex; justify-content:center; padding:32px 16px; }
+  .page-frame{ display:flex; gap:10px; align-items:flex-start; }
+  .page-wrap{ position:relative; background:#fff; box-shadow:0 6px 24px rgba(38,36,33,0.18); }
+  .highlight-layer{ position:absolute; inset:0; pointer-events:none; }
+  .hl-rect{ position:absolute; mix-blend-mode:multiply; border-radius:2px; pointer-events:auto; cursor:pointer; }
+  .textLayer{ position:absolute; inset:0; overflow:hidden; line-height:1; opacity:1; transform-origin:0 0; }
+  .textLayer span, .textLayer br{ color:transparent; position:absolute; white-space:pre; cursor:text; transform-origin:0% 0%; }
+  .textLayer ::selection{ background:rgba(63,110,99,0.3); }
+  .selection-toolbar{
+    position:absolute; display:flex; gap:6px; align-items:center; background:var(--spine); padding:6px 8px;
+    border-radius:999px; box-shadow:0 6px 18px rgba(0,0,0,0.25); z-index:30; transform:translate(-50%,-100%);
+  }
+  .selection-toolbar .swatch-dot{ width:18px; height:18px; border-radius:50%; cursor:pointer; border:2px solid transparent; }
+  .selection-toolbar .swatch-dot:hover{ transform:scale(1.15); }
+  .selection-toolbar::after{
+    content:''; position:absolute; left:50%; bottom:-5px; transform:translateX(-50%);
+    border-width:5px 5px 0 5px; border-style:solid; border-color:var(--spine) transparent transparent transparent;
+  }
+  .margin-strip{ width:14px; align-self:stretch; position:relative; border-left:1px dashed var(--line); }
+  .tick{ position:absolute; left:3px; width:8px; height:3px; border-radius:2px; cursor:pointer; }
+
+  .sidebar{ width:280px; background:var(--sidebar-bg); border-left:1px solid var(--line); overflow-y:auto; flex-shrink:0; }
+  .sidebar.hidden{ display:none; }
+  .sidebar h2{ font-family:var(--serif); font-style:italic; font-weight:400; font-size:17px; padding:16px 16px 8px; margin:0; }
+  .hl-item{ padding:10px 14px; border-bottom:1px solid var(--line); display:flex; gap:8px; cursor:pointer; }
+  .hl-item:hover{ background:var(--accent-soft); }
+  .hl-item.flash{ background:var(--accent-soft); }
+  .hl-bar{ width:4px; border-radius:2px; flex-shrink:0; }
+  .hl-body{ flex:1; min-width:0; }
+  .hl-page{ font-size:11px; color:var(--ink-soft); margin-bottom:2px; }
+  .hl-text{ font-size:13px; line-height:1.4; }
+  .hl-note{ margin-top:6px; width:100%; font-size:12px; font-family:var(--sans); padding:6px; border:1px solid var(--line); border-radius:6px; resize:vertical; min-height:32px; }
+  .hl-actions{ display:flex; gap:8px; margin-top:6px; }
+  .hl-actions button{ background:none; border:none; color:var(--ink-soft); font-size:11px; cursor:pointer; padding:0; text-decoration:underline; }
+  .empty-sidebar{ padding:18px; font-size:13px; color:var(--ink-soft); }
+
+  /* ---- sidebar tabs + AI chat ---- */
+  .sidebar-tabs{ display:flex; border-bottom:1px solid var(--line); }
+  .sidebar-tabs button{
+    flex:1; background:none; border:none; padding:12px 8px; font-size:13px; cursor:pointer;
+    color:var(--ink-soft); border-bottom:2px solid transparent;
+  }
+  .sidebar-tabs button.active{ color:var(--ink); border-bottom-color:var(--accent); font-weight:600; }
+  .chat-panel{ display:flex; flex-direction:column; height:calc(100% - 45px); }
+  .chat-key-setup{ padding:16px; font-size:13px; color:var(--ink-soft); }
+  .chat-key-setup input{ width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:13px; margin:8px 0; }
+  .chat-key-setup a{ color:var(--accent); }
+  .chat-messages{ flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:10px; }
+  .chat-msg{ font-size:13px; line-height:1.5; padding:8px 12px; border-radius:12px; max-width:92%; white-space:pre-wrap; }
+  .chat-msg.user{ align-self:flex-end; background:var(--accent); color:#fff; }
+  .chat-msg.model{ align-self:flex-start; background:#fff; border:1px solid var(--line); }
+  .chat-msg.pending{ color: var(--ink-soft); font-style:italic; }
+  .chat-input-row{ display:flex; gap:6px; padding:10px; border-top:1px solid var(--line); }
+  .chat-input-row textarea{
+    flex:1; resize:none; border:1px solid var(--line); border-radius:8px; padding:8px; font-family:var(--sans); font-size:13px; min-height:38px;
+  }
+  .chat-input-row button{ background:var(--accent); color:#fff; border:none; border-radius:8px; padding:0 14px; cursor:pointer; font-size:13px; }
+  .chat-empty{ padding:18px; font-size:13px; color:var(--ink-soft); line-height:1.5; }
+
+  .selection-toolbar .explain-btn{
+    background:rgba(255,255,255,0.12); color:var(--spine-text); border:1px solid rgba(255,255,255,0.3);
+    border-radius:999px; padding:3px 10px; font-size:12px; cursor:pointer; white-space:nowrap;
+  }
+  .selection-toolbar .divider{ width:1px; height:16px; background:rgba(255,255,255,0.25); }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+(function(){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  const COLORS = [
+    {name:'amber', hex:'#E9B949'}, {name:'sage', hex:'#7FAE8C'},
+    {name:'rose', hex:'#D98CAA'}, {name:'sky', hex:'#7CB2D9'},
+  ];
+
+  const state = {
+    view: 'connect',        // connect -> auth -> library -> reader
+    sb: null, session: null,
+    authMode: 'login', authError: '',
+    documents: [], currentDoc: null,
+    pdf: null, pageNum: 1, numPages: 0, scale: 1.25,
+    highlights: [], sidebarOpen: true, saving: false,
+    sidebarTab: 'highlights', geminiKey: '', chatMessages: [], docFullText: '', chatBusy: false,
+  };
+
+  const root = document.getElementById('app-root');
+  const uid = () => 'h' + Math.random().toString(36).slice(2,10);
+  const escapeHtml = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+  function render(){
+    if (state.view === 'connect') return renderConnect();
+    if (state.view === 'auth') return renderAuth();
+    if (state.view === 'library') return renderLibrary();
+    if (state.view === 'reader') return renderReaderShell();
+  }
+
+  // ---------------- CONNECT (paste your Supabase project URL + anon key) ----------------
+  function renderConnect(){
+    root.innerHTML = `
+      <div class="screen"><div class="card">
+        <h1>Conecta tu nube</h1>
+        <p class="hint">Pega los datos de tu proyecto Supabase (Settings → API). Solo se usan en tu navegador, en esta sesión; no se guardan en ningún lado.<br><br>
+        <strong>Nota:</strong> esto no conectará dentro de la vista previa del chat (bloquea la librería de Supabase). Abre este archivo directamente en tu navegador para probarlo.</p>
+        <div class="field"><label>Project URL</label><input id="sb-url" placeholder="https://xxxx.supabase.co"></div>
+        <div class="field"><label>Anon public key</label><input id="sb-key" placeholder="eyJhbGciOi..."></div>
+        <button class="btn-primary" id="connect-btn">Conectar</button>
+        <div class="error-msg" id="connect-error"></div>
+      </div></div>`;
+    document.getElementById('connect-btn').addEventListener('click', async () => {
+      const url = document.getElementById('sb-url').value.trim();
+      const key = document.getElementById('sb-key').value.trim();
+      const errEl = document.getElementById('connect-error');
+      if (!url || !key){ errEl.textContent = 'Completa ambos campos.'; return; }
+      try{
+        state.sb = window.supabase.createClient(url, key);
+        const { data: { session } } = await state.sb.auth.getSession();
+        state.session = session;
+        state.view = session ? 'library' : 'auth';
+        if (session) await loadDocuments();
+        render();
+      }catch(err){
+        errEl.textContent = 'No se pudo conectar: ' + err.message;
+      }
+    });
+  }
+
+  // ---------------- AUTH (email + password) ----------------
+  function renderAuth(){
+    const isLogin = state.authMode === 'login';
+    root.innerHTML = `
+      <div class="screen"><div class="card">
+        <h1>${isLogin ? 'Inicia sesión' : 'Crea tu cuenta'}</h1>
+        <p class="hint">Tus documentos y subrayados quedan ligados a esta cuenta y protegidos por fila (RLS) en tu base de datos.</p>
+        <div class="field"><label>Correo</label><input id="auth-email" type="email"></div>
+        <div class="field"><label>Contraseña</label><input id="auth-pass" type="password"></div>
+        <button class="btn-primary" id="auth-btn">${isLogin ? 'Entrar' : 'Registrarme'}</button>
+        <div class="error-msg" id="auth-error">${state.authError||''}</div>
+        <button class="btn-link" id="auth-switch">${isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia sesión'}</button>
+      </div></div>`;
+    document.getElementById('auth-switch').addEventListener('click', () => {
+      state.authMode = isLogin ? 'signup' : 'login'; state.authError=''; render();
+    });
+    document.getElementById('auth-btn').addEventListener('click', async () => {
+      const email = document.getElementById('auth-email').value.trim();
+      const password = document.getElementById('auth-pass').value;
+      const errEl = document.getElementById('auth-error');
+      errEl.textContent = '';
+      const fn = isLogin ? 'signInWithPassword' : 'signUp';
+      const { data, error } = await state.sb.auth[fn]({ email, password });
+      if (error){ errEl.textContent = error.message; return; }
+      if (!isLogin && !data.session){
+        errEl.className = 'ok-msg';
+        errEl.textContent = 'Cuenta creada. Revisa tu correo para confirmar, luego inicia sesión.';
+        state.authMode = 'login';
+        return;
+      }
+      state.session = data.session;
+      state.view = 'library';
+      await loadDocuments();
+      render();
+    });
+  }
+
+  // ---------------- LIBRARY ----------------
+  async function loadDocuments(){
+    const { data, error } = await state.sb.from('documents').select('*').order('created_at', {ascending:false});
+    state.documents = error ? [] : data;
+  }
+
+  function renderLibrary(){
+    root.innerHTML = `
+      <div class="library-wrap">
+        <div class="library-header">
+          <h1>Tu biblioteca</h1>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <label class="upload-btn">Subir PDF<input id="upload-input" type="file" accept="application/pdf"></label>
+            <button class="logout-link" id="logout-btn">Cerrar sesión</button>
+          </div>
+        </div>
+        <div class="doc-list" id="doc-list">
+          ${state.documents.length === 0 ? `<div class="empty-lib">Aún no subes ningún PDF. Empieza subiendo el primero.</div>` :
+            state.documents.map(d => `
+              <div class="doc-item" data-id="${d.id}">
+                <div><div class="doc-title">${escapeHtml(d.title)}</div><div class="doc-meta">${d.num_pages ? d.num_pages+' páginas' : ''}</div></div>
+                <span>Abrir →</span>
+              </div>`).join('')
+          }
+        </div>
+      </div>`;
+    document.getElementById('upload-input').addEventListener('change', onUploadPdf);
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      await state.sb.auth.signOut();
+      state.session = null; state.view = 'auth'; render();
+    });
+    document.querySelectorAll('.doc-item').forEach(el => {
+      el.addEventListener('click', () => openDocument(el.dataset.id));
+    });
+  }
+
+  async function onUploadPdf(e){
+    const file = e.target.files[0];
+    if (!file) return;
+    const userId = state.session.user.id;
+    const path = `${userId}/${Date.now()}_${file.name}`;
+    const { error: upErr } = await state.sb.storage.from('pdfs').upload(path, file);
+    if (upErr){ alert('Error subiendo el archivo: ' + upErr.message); return; }
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+    const { error: dbErr } = await state.sb.from('documents').insert({
+      title: file.name.replace(/\.pdf$/i,''), storage_path: path, num_pages: pdf.numPages
+    });
+    if (dbErr){ alert('Error guardando metadatos: ' + dbErr.message); return; }
+    await loadDocuments();
+    renderLibrary();
+  }
+
+  async function openDocument(docId){
+    const doc = state.documents.find(d => d.id === docId);
+    if (!doc) return;
+    state.currentDoc = doc;
+
+    const { data: fileData, error: dlErr } = await state.sb.storage.from('pdfs').download(doc.storage_path);
+    if (dlErr){ alert('Error descargando el PDF: ' + dlErr.message); return; }
+    const buf = await fileData.arrayBuffer();
+    state.pdf = await pdfjsLib.getDocument({data: buf}).promise;
+    state.numPages = state.pdf.numPages;
+
+    const { data: progress } = await state.sb.from('reading_progress')
+      .select('page').eq('document_id', docId).maybeSingle();
+    state.pageNum = progress?.page || 1;
+
+    const { data: hls } = await state.sb.from('highlights').select('*').eq('document_id', docId);
+    state.highlights = (hls||[]).map(h => ({ id:h.id, page:h.page, rects:h.rects, color:h.color, text:h.text, note:h.note||'' }));
+
+    state.chatMessages = [];
+    state.docFullText = await extractFullText(state.pdf);
+
+    state.view = 'reader';
+    renderReaderShell();
+  }
+
+  // Pulls the text of every page so the AI chat has context of the whole document.
+  // Capped to keep requests fast/cheap; still far more than most single chapters need.
+  async function extractFullText(pdf){
+    const MAX_CHARS = 400000;
+    let out = '';
+    for (let i = 1; i <= pdf.numPages; i++){
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = content.items.map(it => it.str).join(' ');
+      out += `\n\n[Página ${i}]\n${pageText}`;
+      if (out.length > MAX_CHARS){ out = out.slice(0, MAX_CHARS) + '\n\n[...documento truncado por longitud...]'; break; }
+    }
+    return out;
+  }
+
+  // ---------------- READER SHELL ----------------
+  function renderReaderShell(){
+    root.innerHTML = `
+      <div class="spine" id="spine"></div>
+      <div class="workspace">
+        <div class="stage" id="stage">
+          <div class="page-frame">
+            <div class="page-wrap" id="page-wrap"></div>
+            <div class="margin-strip" id="margin-strip"></div>
+          </div>
+        </div>
+        <div class="sidebar ${state.sidebarOpen?'':'hidden'}" id="sidebar"></div>
+      </div>`;
+    renderToolbar();
+    renderSidebar();
+    renderPage(state.pageNum);
+  }
+
+  function renderToolbar(){
+    const spine = document.getElementById('spine');
+    spine.innerHTML = `
+      <span class="brand" id="back-to-library" title="Volver a tu biblioteca">← Lector</span>
+      <div class="pagectl">
+        <button id="prev-page" ${state.pageNum<=1?'disabled':''}>‹</button>
+        <input id="page-input" type="number" min="1" max="${state.numPages}" value="${state.pageNum}">
+        <span>/ ${state.numPages}</span>
+        <button id="next-page" ${state.pageNum>=state.numPages?'disabled':''}>›</button>
+      </div>
+      <button id="zoom-out">A−</button>
+      <button id="zoom-in">A+</button>
+      <div class="spacer"></div>
+      <span class="sync-dot ${state.saving?'saving':''}" title="${state.saving?'Guardando...':'Guardado en la nube'}"></span>
+      <button id="toggle-sidebar">${state.sidebarOpen?'Ocultar notas':'Ver notas'}</button>
+    `;
+    document.getElementById('back-to-library').addEventListener('click', () => { state.view='library'; renderLibrary(); });
+    document.getElementById('prev-page').addEventListener('click', () => goToPage(state.pageNum-1));
+    document.getElementById('next-page').addEventListener('click', () => goToPage(state.pageNum+1));
+    document.getElementById('page-input').addEventListener('change', e => goToPage(parseInt(e.target.value)||1));
+    document.getElementById('zoom-in').addEventListener('click', () => { state.scale=Math.min(state.scale+0.2,3); renderPage(state.pageNum); });
+    document.getElementById('zoom-out').addEventListener('click', () => { state.scale=Math.max(state.scale-0.2,0.5); renderPage(state.pageNum); });
+    document.getElementById('toggle-sidebar').addEventListener('click', () => {
+      state.sidebarOpen = !state.sidebarOpen;
+      document.getElementById('sidebar').classList.toggle('hidden', !state.sidebarOpen);
+      renderToolbar();
+    });
+  }
+
+  function renderSidebar(){
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+    sidebar.innerHTML = `
+      <div class="sidebar-tabs">
+        <button id="tab-highlights" class="${state.sidebarTab==='highlights'?'active':''}">Subrayados</button>
+        <button id="tab-chat" class="${state.sidebarTab==='chat'?'active':''}">Chat IA</button>
+      </div>
+      <div id="sidebar-body"></div>
+    `;
+    document.getElementById('tab-highlights').addEventListener('click', () => { state.sidebarTab='highlights'; renderSidebar(); });
+    document.getElementById('tab-chat').addEventListener('click', () => { state.sidebarTab='chat'; renderSidebar(); });
+    if (state.sidebarTab === 'highlights') renderHighlightsTab(); else renderChatTab();
+  }
+
+  function renderHighlightsTab(){
+    const body = document.getElementById('sidebar-body');
+    if (state.highlights.length === 0){
+      body.innerHTML = `<div class="empty-sidebar">Selecciona texto en el documento para crear el primero.</div>`;
+      return;
+    }
+    const sorted = [...state.highlights].sort((a,b)=> a.page-b.page);
+    body.innerHTML = sorted.map(h => `
+      <div class="hl-item" data-jump="${h.page}" data-id="${h.id}">
+        <div class="hl-bar" style="background:${h.color}"></div>
+        <div class="hl-body">
+          <div class="hl-page">Página ${h.page}</div>
+          <div class="hl-text">"${escapeHtml(h.text.length>140? h.text.slice(0,140)+'…':h.text)}"</div>
+          <textarea class="hl-note" data-note-id="${h.id}" placeholder="Agregar una nota...">${escapeHtml(h.note||'')}</textarea>
+          <div class="hl-actions"><button class="hl-delete" data-del-id="${h.id}">Eliminar</button></div>
+        </div>
+      </div>`).join('');
+    body.querySelectorAll('.hl-item').forEach(item => {
+      item.addEventListener('click', e => {
+        if (e.target.tagName === 'TEXTAREA' || e.target.classList.contains('hl-delete')) return;
+        goToPage(parseInt(item.dataset.jump));
+      });
+    });
+    body.querySelectorAll('.hl-note').forEach(ta => {
+      ta.addEventListener('click', e => e.stopPropagation());
+      ta.addEventListener('change', async e => {
+        const h = state.highlights.find(x => x.id === e.target.dataset.noteId);
+        if (!h) return;
+        h.note = e.target.value;
+        setSaving(true);
+        await state.sb.from('highlights').update({note: h.note}).eq('id', h.id);
+        setSaving(false);
+      });
+    });
+    body.querySelectorAll('.hl-delete').forEach(btn => {
+      btn.addEventListener('click', async e => {
+        e.stopPropagation();
+        const id = btn.dataset.delId;
+        state.highlights = state.highlights.filter(h => h.id !== id);
+        renderSidebar(); drawHighlightLayer(state.pageNum); drawMarginStrip(state.pageNum);
+        setSaving(true);
+        await state.sb.from('highlights').delete().eq('id', id);
+        setSaving(false);
+      });
+    });
+  }
+
+  // ---------------- AI CHAT TAB ----------------
+  function renderChatTab(){
+    const body = document.getElementById('sidebar-body');
+    if (!state.geminiKey){
+      body.innerHTML = `
+        <div class="chat-key-setup">
+          Pega tu clave de la API de Gemini para activar el chat sobre esta lectura.
+          Se usa solo en tu navegador, en esta sesión.<br>
+          Consíguela gratis en <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a>.
+          <input id="gemini-key-input" placeholder="AIza...">
+          <button class="btn-primary" id="gemini-key-btn">Activar chat</button>
+        </div>`;
+      document.getElementById('gemini-key-btn').addEventListener('click', () => {
+        const key = document.getElementById('gemini-key-input').value.trim();
+        if (!key) return;
+        state.geminiKey = key;
+        renderChatTab();
+      });
+      return;
+    }
+
+    body.innerHTML = `
+      <div class="chat-panel">
+        <div class="chat-messages" id="chat-messages">
+          ${state.chatMessages.length === 0 ? `<div class="chat-empty">Pregunta lo que quieras sobre este documento, o selecciona un fragmento en la página y pulsa "Explicar".</div>` : ''}
+          ${state.chatMessages.map(m => `<div class="chat-msg ${m.role}">${escapeHtml(m.text)}</div>`).join('')}
+          ${state.chatBusy ? `<div class="chat-msg model pending">Pensando...</div>` : ''}
+        </div>
+        <div class="chat-input-row">
+          <textarea id="chat-input" placeholder="Pregunta algo sobre la lectura..."></textarea>
+          <button id="chat-send">Enviar</button>
+        </div>
+      </div>`;
+    const msgBox = document.getElementById('chat-messages');
+    msgBox.scrollTop = msgBox.scrollHeight;
+
+    const input = document.getElementById('chat-input');
+    const send = () => {
+      const text = input.value.trim();
+      if (!text || state.chatBusy) return;
+      input.value = '';
+      sendChatMessage(text);
+    };
+    document.getElementById('chat-send').addEventListener('click', send);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); send(); }
+    });
+  }
+
+  async function sendChatMessage(userText){
+    state.chatMessages.push({ role:'user', text:userText });
+    state.chatBusy = true;
+    renderChatTab();
+    const reply = await askGemini(userText);
+    state.chatBusy = false;
+    state.chatMessages.push({ role:'model', text: reply });
+    renderChatTab();
+  }
+
+  async function askGemini(userText){
+    const systemInstruction = `Eres un asistente de lectura dentro de una app tipo lector de PDF. El usuario está leyendo el documento "${state.currentDoc?.title || ''}", actualmente en la página ${state.pageNum} de ${state.numPages}. Aquí tienes el texto extraído del documento completo (puede venir con saltos de página marcados como [Página N]):\n\n${state.docFullText}\n\nInstrucciones: responde en español, de forma clara y sencilla. Cuando cites algo, menciona la página si la sabes.\n\nMUY IMPORTANTE: cuando te pidan explicar un término, frase o concepto, tu prioridad es que el usuario lo entienda, no reportar si el documento lo define o no. Si el documento SÍ lo define, usa esa definición. Si el documento NO lo define (solo lo menciona de pasada), explícalo de todas formas usando tu propio conocimiento general del tema, con lenguaje simple y un ejemplo concreto, como si se lo explicaras a alguien sin conocimiento previo. Solo aclara brevemente al final que el documento no profundiza en él, pero nunca te quedes solo en "el documento no lo explica" sin dar la explicación real.`;
+    try{
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type':'application/json',
+          'x-goog-api-key': state.geminiKey,
+        },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemInstruction }] },
+          contents: state.chatMessages.map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts:[{text:m.text}] }))
+        })
+      });
+      const data = await res.json();
+      if (data.error) return `Error de la API: ${data.error.message}`;
+      return data.candidates?.[0]?.content?.parts?.map(p=>p.text).join('') || 'No obtuve respuesta, intenta de nuevo.';
+    }catch(err){
+      return `No se pudo conectar con Gemini: ${err.message}`;
+    }
+  }
+
+  function explainSelection(){
+    if (!pendingSelection) return;
+    const { text, pageNum } = pendingSelection;
+    hideSelectionToolbar();
+    window.getSelection().removeAllRanges();
+    state.sidebarOpen = true;
+    state.sidebarTab = 'chat';
+    document.getElementById('sidebar').classList.remove('hidden');
+    renderToolbar();
+    renderSidebar();
+    sendChatMessage(`Explícame qué significa esto, en términos simples y con un ejemplo (está en la página ${pageNum} del documento): "${text}"`);
+  }
+
+  function setSaving(v){
+    state.saving = v;
+    const dot = document.querySelector('.sync-dot');
+    if (dot){ dot.classList.toggle('saving', v); dot.title = v ? 'Guardando...' : 'Guardado en la nube'; }
+  }
+
+  async function goToPage(n){
+    n = Math.max(1, Math.min(state.numPages, n));
+    state.pageNum = n;
+    renderToolbar();
+    renderPage(n);
+    setSaving(true);
+    await state.sb.from('reading_progress').upsert({
+      document_id: state.currentDoc.id, page: n, updated_at: new Date().toISOString()
+    }, { onConflict: 'document_id,user_id' });
+    setSaving(false);
+  }
+
+  async function renderPage(num){
+    const page = await state.pdf.getPage(num);
+    const viewport = page.getViewport({scale: state.scale});
+    const pageWrap = document.getElementById('page-wrap');
+    pageWrap.innerHTML = '';
+    pageWrap.style.width = viewport.width+'px'; pageWrap.style.height = viewport.height+'px';
+
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width; canvas.height = viewport.height;
+    pageWrap.appendChild(canvas);
+    await page.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+
+    const highlightLayer = document.createElement('div');
+    highlightLayer.className = 'highlight-layer'; highlightLayer.id = 'highlight-layer';
+    pageWrap.appendChild(highlightLayer);
+
+    const textLayerDiv = document.createElement('div');
+    textLayerDiv.className = 'textLayer'; textLayerDiv.id = 'text-layer';
+    textLayerDiv.style.width = viewport.width+'px'; textLayerDiv.style.height = viewport.height+'px';
+    pageWrap.appendChild(textLayerDiv);
+
+    const textContent = await page.getTextContent();
+    await pdfjsLib.renderTextLayer({ textContentSource: textContent, container: textLayerDiv, viewport }).promise;
+
+    drawHighlightLayer(num);
+    drawMarginStrip(num);
+    textLayerDiv.addEventListener('mouseup', () => onSelectionEnd(num));
+  }
+
+  function drawHighlightLayer(pageNum){
+    const layer = document.getElementById('highlight-layer');
+    if (!layer) return;
+    layer.innerHTML = '';
+    state.highlights.filter(h => h.page === pageNum).forEach(h => {
+      h.rects.forEach(r => {
+        const div = document.createElement('div');
+        div.className = 'hl-rect'; div.dataset.hid = h.id;
+        div.style.left=(r.x*100)+'%'; div.style.top=(r.y*100)+'%';
+        div.style.width=(r.w*100)+'%'; div.style.height=(r.h*100)+'%';
+        div.style.background = h.color;
+        div.title = h.note || h.text.slice(0,60);
+        div.addEventListener('click', () => flashSidebarItem(h.id));
+        layer.appendChild(div);
+      });
+    });
+  }
+
+  function drawMarginStrip(pageNum){
+    const strip = document.getElementById('margin-strip');
+    const pageWrap = document.getElementById('page-wrap');
+    if (!strip || !pageWrap) return;
+    strip.innerHTML = ''; strip.style.height = pageWrap.style.height;
+    state.highlights.filter(h => h.page === pageNum).forEach(h => {
+      const top = h.rects[0].y * parseFloat(pageWrap.style.height);
+      const tick = document.createElement('div');
+      tick.className = 'tick'; tick.style.top = top+'px'; tick.style.background = h.color;
+      tick.title = h.text.slice(0,60);
+      tick.addEventListener('click', () => flashSidebarItem(h.id));
+      strip.appendChild(tick);
+    });
+  }
+
+  function flashSidebarItem(id){
+    if (!state.sidebarOpen){
+      state.sidebarOpen = true;
+      document.getElementById('sidebar').classList.remove('hidden');
+      renderToolbar();
+    }
+    const el = document.querySelector(`.hl-item[data-id="${id}"]`);
+    if (!el) return;
+    el.scrollIntoView({behavior:'smooth', block:'center'});
+    el.classList.add('flash');
+    setTimeout(()=>el.classList.remove('flash'), 900);
+  }
+
+  // ---------------- selection -> floating color picker -> commit ----------------
+  let pendingSelection = null;
+
+  function onSelectionEnd(pageNum){
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount===0){ hideSelectionToolbar(); return; }
+    const text = sel.toString().trim();
+    if (!text){ hideSelectionToolbar(); return; }
+    const range = sel.getRangeAt(0);
+    const textLayerDiv = document.getElementById('text-layer');
+    if (!textLayerDiv.contains(range.commonAncestorContainer)){ hideSelectionToolbar(); return; }
+    const pageBox = textLayerDiv.getBoundingClientRect();
+    const clientRects = Array.from(range.getClientRects()).filter(r=>r.width>0&&r.height>0);
+    if (clientRects.length===0){ hideSelectionToolbar(); return; }
+    const rects = clientRects.map(r => ({
+      x:(r.left-pageBox.left)/pageBox.width, y:(r.top-pageBox.top)/pageBox.height,
+      w:r.width/pageBox.width, h:r.height/pageBox.height,
+    }));
+    pendingSelection = { pageNum, rects, text };
+    showSelectionToolbar(clientRects[0], pageBox);
+  }
+
+  function showSelectionToolbar(firstRect, pageBox){
+    let bar = document.getElementById('selection-toolbar');
+    if (!bar){
+      bar = document.createElement('div'); bar.id='selection-toolbar'; bar.className='selection-toolbar';
+      document.getElementById('page-wrap').appendChild(bar);
+    }
+    bar.innerHTML =
+      COLORS.map(c => `<div class="swatch-dot" data-color="${c.hex}" style="background:${c.hex}" title="Subrayar en ${c.name}"></div>`).join('') +
+      `<div class="divider"></div><button class="explain-btn" id="explain-btn">✨ Explicar</button>`;
+    bar.style.left = (firstRect.left-pageBox.left+firstRect.width/2)+'px';
+    bar.style.top = (firstRect.top-pageBox.top-10)+'px';
+    bar.style.display = 'flex';
+    bar.querySelectorAll('.swatch-dot').forEach(dot => {
+      dot.addEventListener('mousedown', e => e.stopPropagation());
+      dot.addEventListener('click', () => commitHighlight(dot.dataset.color));
+    });
+    document.getElementById('explain-btn').addEventListener('mousedown', e => e.stopPropagation());
+    document.getElementById('explain-btn').addEventListener('click', explainSelection);
+  }
+  function hideSelectionToolbar(){
+    const bar = document.getElementById('selection-toolbar');
+    if (bar) bar.style.display = 'none';
+    pendingSelection = null;
+  }
+
+  async function commitHighlight(color){
+    if (!pendingSelection) return;
+    const { pageNum, rects, text } = pendingSelection;
+    const localId = uid();
+    state.highlights.push({ id: localId, page: pageNum, rects, color, text, note: '' });
+    window.getSelection().removeAllRanges();
+    hideSelectionToolbar();
+    drawHighlightLayer(pageNum); drawMarginStrip(pageNum); renderSidebar();
+
+    setSaving(true);
+    const { data, error } = await state.sb.from('highlights').insert({
+      document_id: state.currentDoc.id, page: pageNum, rects, color, text
+    }).select().single();
+    setSaving(false);
+    if (!error && data){
+      const h = state.highlights.find(x => x.id === localId);
+      if (h) h.id = data.id; // swap temp id for the real DB id
+      renderSidebar();
+    }
+  }
+
+  document.addEventListener('mousedown', e => {
+    const bar = document.getElementById('selection-toolbar');
+    if (bar && bar.style.display!=='none' && !bar.contains(e.target)) hideSelectionToolbar();
+  });
+
+  render();
+})();
+</script>
