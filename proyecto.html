@@ -188,6 +188,7 @@
     .chat-msg.user{align-self:flex-end;background:var(--accent);color:#fff;border-radius:12px 12px 3px 12px}
     .chat-msg.model{align-self:flex-start;background:#fff;border:1px solid var(--line);border-radius:12px 12px 12px 3px}
     .chat-msg.pending{color:var(--ink-soft);font-style:italic;background:#fff;border:1px solid var(--line)}
+    .chat-cite-block{background:rgba(255,255,255,0.2);color:#fff;padding:6px 10px;border-radius:8px;font-size:11px;font-style:italic;margin-bottom:8px;border-left:3px solid rgba(255,255,255,0.5);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis}
     .chat-empty{padding:22px 18px;font-size:13px;color:var(--ink-soft);line-height:1.65}
     .chat-input-row{display:flex;gap:7px;padding:10px;border-top:1px solid var(--line);flex-shrink:0}
     .chat-textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:var(--r);padding:8px 11px;font-family:var(--sans);font-size:13px;min-height:38px;max-height:100px;outline:none;line-height:1.4}
@@ -660,6 +661,18 @@ function renderFcTab(){
 }
 
 // ---- Chat ----
+function parseChatMsg(text) {
+  if (text.startsWith('> "')) {
+    const parts = text.split('"\n\n');
+    if (parts.length >= 2) {
+      const cite = parts[0].substring(3);
+      const q = parts.slice(1).join('"\n\n');
+      return `<div class="chat-cite-block">"${esc(cite)}"</div>${esc(q)}`;
+    }
+  }
+  return esc(text);
+}
+
 function renderChatTab(){
   const b=document.getElementById('sb-body');
   if(!state.geminiKey){
@@ -676,7 +689,7 @@ function renderChatTab(){
       <button class="thread-btn danger" id="th-del" title="Eliminar chat">🗑</button>
     </div>
     <div class="chat-header-bar"><span>${mc>0?mc+' msgs':'Vacío'}</span><div style="display:flex;gap:8px"><button class="chat-action-btn" id="ck-btn">Cambiar clave</button></div></div>
-    <div class="chat-messages" id="cm">${mc===0?'<div class="chat-empty">Pregunta sobre el documento o selecciona texto y pulsa "✨ Explicar".</div>':''}${state.chatMessages.map(m=>`<div class="chat-msg ${m.role}">${esc(m.text)}</div>`).join('')}${state.chatBusy?'<div class="chat-msg model pending">Pensando…</div>':''}</div>
+    <div class="chat-messages" id="cm">${mc===0?'<div class="chat-empty">Pregunta sobre el documento o selecciona texto y pulsa "✨ Explicar".</div>':''}${state.chatMessages.map(m=>`<div class="chat-msg ${m.role}">${parseChatMsg(m.text)}</div>`).join('')}${state.chatBusy?'<div class="chat-msg model pending">Pensando…</div>':''}</div>
     <div class="chat-input-row">
       <textarea class="chat-textarea" id="ci" placeholder="${esc(ph)}" rows="1"></textarea>
       <button class="chat-send-btn" id="cs" ${state.chatBusy?'disabled':''}>Enviar</button>
