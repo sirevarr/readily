@@ -1,691 +1,974 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Readily</title>
+  <meta name="description" content="Tu lector personal de PDFs con subrayados, notas y chat con IA.">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#201E1B">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Readily">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/web/pdf_viewer.min.css">
+  <style>
+    :root {
+      --paper:#F3EFE6;--ink:#262421;--ink-soft:#5B564E;
+      --spine:#201E1B;--spine-text:#F3EFE6;
+      --accent:#3F6E63;--accent-h:#34594f;--accent-soft:#DCE7E3;
+      --line:#DDD5C4;--sidebar-bg:#FBF9F4;
+      --serif:Georgia,"Iowan Old Style","Palatino Linotype",serif;
+      --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+      --r:10px;--shadow:0 8px 28px rgba(38,36,33,.1);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
+    body{font-family:var(--sans);color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased}
+    #app-root{min-height:100vh;display:flex;flex-direction:column}
+
+    .loading-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+    .spinner{width:38px;height:38px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .75s linear infinite}
+    .loading-label{font-size:14px;color:var(--ink-soft)}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    .screen{flex:1;display:flex;align-items:center;justify-content:center;padding:24px}
+    .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:36px 32px;width:100%;max-width:420px;box-shadow:var(--shadow)}
+    .card-logo{font-family:var(--serif);font-style:italic;font-size:30px;color:var(--accent);margin-bottom:2px}
+    .card-tagline{color:var(--ink-soft);font-size:13px;margin-bottom:28px}
+    .card h2{font-size:18px;font-weight:600;margin-bottom:6px}
+    .card-hint{color:var(--ink-soft);font-size:13px;line-height:1.55;margin-bottom:22px}
+    .field{margin-bottom:14px}
+    .field label{display:block;font-size:12px;font-weight:500;color:var(--ink-soft);margin-bottom:5px}
+    .field input{width:100%;padding:10px 13px;border:1px solid var(--line);border-radius:var(--r);font-size:14px;font-family:var(--sans);outline:none;transition:border-color .15s}
+    .field input:focus{border-color:var(--accent)}
+    .btn-primary{width:100%;background:var(--accent);color:#fff;border:none;padding:12px;border-radius:var(--r);font-size:14px;font-weight:500;cursor:pointer;margin-top:6px;transition:background .15s}
+    .btn-primary:hover{background:var(--accent-h)}
+    .btn-link{background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;padding:0;text-decoration:underline;margin-top:16px;display:block}
+    .error-msg{color:#B4433A;font-size:13px;margin-top:10px;line-height:1.4}
+    .ok-msg{color:var(--accent);font-size:13px;margin-top:10px;line-height:1.4}
+
+    .library-wrap{flex:1;padding:44px 20px 60px;max-width:760px;margin:0 auto;width:100%}
+    .library-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px}
+    .library-title{font-family:var(--serif);font-style:italic;font-weight:400;font-size:30px}
+    .library-title span{display:block;font-family:var(--sans);font-style:normal;font-size:13px;color:var(--ink-soft);font-weight:400;margin-top:3px}
+    .library-actions{display:flex;gap:12px;align-items:center;margin-top:6px}
+    .upload-btn{background:var(--accent);color:#fff;border:none;padding:10px 20px;border-radius:999px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
+    .upload-btn:hover{background:var(--accent-h)}
+    .upload-btn input{display:none}
+    .logout-link,.disconnect-btn{background:none;border:none;color:var(--ink-soft);font-size:12px;cursor:pointer;text-decoration:underline}
+    .upload-progress{font-size:13px;color:var(--ink-soft);margin-bottom:14px;padding:10px 14px;background:#fff;border:1px solid var(--line);border-radius:var(--r);display:none}
+    .doc-list{display:flex;flex-direction:column;gap:10px}
+    .doc-item{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid var(--line);border-radius:12px;padding:17px 20px;cursor:pointer;transition:background .12s,transform .1s}
+    .doc-item:hover{background:var(--accent-soft);transform:translateX(2px)}
+    .doc-title{font-size:14px;font-weight:500;margin-bottom:3px}
+    .doc-meta{font-size:12px;color:var(--ink-soft)}
+    .doc-arrow{color:var(--ink-soft);font-size:18px}
+    .empty-lib{color:var(--ink-soft);font-size:14px;text-align:center;padding:64px 20px;line-height:1.8}
+
+    .reader-header{position:sticky;top:0;z-index:20}
+    .spine{background:var(--spine);color:var(--spine-text);display:flex;align-items:center;gap:10px;padding:9px 16px;flex-wrap:wrap}
+    .brand{font-family:var(--serif);font-style:italic;font-size:18px;margin-right:4px;white-space:nowrap;cursor:pointer;opacity:.85;user-select:none}
+    .brand:hover{opacity:1}
+    .spine-sep{width:1px;height:20px;background:rgba(255,255,255,.12);flex-shrink:0}
+    .spine-btn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:var(--spine-text);padding:6px 12px;border-radius:999px;font-size:13px;cursor:pointer;white-space:nowrap;line-height:1}
+    .spine-btn:hover{background:rgba(255,255,255,.16)}
+    .spine-btn:disabled{opacity:.3;cursor:not-allowed}
+    .spine-btn.active{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.38)}
+    .pagectl{display:flex;align-items:center;gap:6px;font-size:13px}
+    .pagectl input{width:48px;text-align:center;padding:5px 4px;border-radius:7px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:var(--spine-text);font-size:13px;outline:none}
+    .page-total{font-size:13px;opacity:.55}
+    .spacer{flex:1}
+    .sync-dot{width:7px;height:7px;border-radius:50%;background:#7FAE8C;flex-shrink:0}
+    .sync-dot.saving{background:#E9B949;animation:pulse 1s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:.9}50%{opacity:.35}}
+
+    .search-bar-row{background:#181512;padding:7px 14px;display:flex;gap:8px;align-items:center;border-top:1px solid rgba(255,255,255,.05)}
+    .search-bar-row.hidden{display:none}
+    .search-input{flex:1;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.18);color:var(--spine-text);border-radius:8px;padding:7px 12px;font-size:13px;font-family:var(--sans);outline:none}
+    .search-input::placeholder{color:rgba(255,255,255,.38)}
+    .search-count{font-size:12px;color:rgba(255,255,255,.45);white-space:nowrap;min-width:70px;text-align:right}
+    .search-nav-btn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:var(--spine-text);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .search-nav-btn:disabled{opacity:.28;cursor:not-allowed}
+    .search-results-panel{background:#fff;border:1px solid var(--line);border-top:none;max-height:210px;overflow-y:auto;box-shadow:0 10px 28px rgba(0,0,0,.13)}
+    .srp-item{padding:9px 16px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px;display:flex;align-items:baseline;gap:10px}
+    .srp-item:hover{background:var(--accent-soft)}
+    .srp-item.active{background:#EEF4F2}
+    .srp-page{font-size:11px;color:var(--ink-soft);background:var(--line);padding:2px 6px;border-radius:4px;flex-shrink:0;font-weight:500}
+    .srp-snippet{flex:1;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .srp-snippet em{background:rgba(233,185,73,.38);font-style:normal;color:var(--ink);padding:0 1px;border-radius:2px}
+
+    .workspace{flex:1;display:flex;min-height:0;position:relative}
+    .stage{flex:1;overflow:auto;display:flex;justify-content:center;padding:36px 16px}
+    .page-frame{display:flex;gap:12px;align-items:flex-start}
+    .page-wrap{position:relative;background:#fff;box-shadow:0 8px 32px rgba(38,36,33,.18)}
+    .highlight-layer{position:absolute;inset:0;pointer-events:none}
+    .hl-rect{position:absolute;mix-blend-mode:multiply;border-radius:2px;pointer-events:auto;cursor:pointer}
+
+    /* ---- MUCHO más visible la selección de texto ---- */
+    .textLayer ::selection{background:rgba(63,110,99,.55) !important}
+    .textLayer ::-moz-selection{background:rgba(63,110,99,.55) !important}
+
+    .selection-toolbar{position:absolute;display:flex;gap:6px;align-items:center;background:var(--spine);padding:7px 10px;border-radius:999px;box-shadow:0 8px 22px rgba(0,0,0,.28);z-index:30;transform:translate(-50%,-100%)}
+    .selection-toolbar .swatch-dot{width:19px;height:19px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .1s}
+    .selection-toolbar .swatch-dot:hover{transform:scale(1.2);box-shadow:0 0 0 2px rgba(255,255,255,.35)}
+    .selection-toolbar::after{content:'';position:absolute;left:50%;bottom:-5px;transform:translateX(-50%);border-width:5px 5px 0 5px;border-style:solid;border-color:var(--spine) transparent transparent transparent}
+    .sel-divider{width:1px;height:16px;background:rgba(255,255,255,.22)}
+    .explain-btn{background:rgba(255,255,255,.1);color:var(--spine-text);border:1px solid rgba(255,255,255,.28);border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer;white-space:nowrap}
+    .explain-btn:hover{background:rgba(255,255,255,.2)}
+    .margin-strip{width:14px;align-self:stretch;position:relative;border-left:1px dashed var(--line)}
+    .tick{position:absolute;left:3px;width:8px;height:3px;border-radius:2px;cursor:pointer}
+    .tick:hover{transform:scaleX(1.5)}
+
+    .sidebar{width:300px;background:var(--sidebar-bg);border-left:1px solid var(--line);overflow:hidden;flex-shrink:0;display:flex;flex-direction:column}
+    .sidebar.hidden{display:none}
+    .sidebar-tabs{display:flex;border-bottom:1px solid var(--line);flex-shrink:0;overflow-x:auto}
+    .sidebar-tabs::-webkit-scrollbar{display:none}
+    .sidebar-tabs button{flex-shrink:0;background:none;border:none;padding:11px 8px;font-size:11.5px;cursor:pointer;color:var(--ink-soft);border-bottom:2px solid transparent;white-space:nowrap}
+    .sidebar-tabs button.active{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+    .fc-badge{display:inline-block;background:var(--accent);color:#fff;border-radius:99px;font-size:9px;padding:1px 5px;margin-left:3px;font-weight:700;vertical-align:middle}
+    .sidebar-body{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+
+    .hl-item{padding:11px 14px;border-bottom:1px solid var(--line);display:flex;gap:8px;cursor:pointer;transition:background .1s}
+    .hl-item:hover{background:var(--accent-soft)}
+    .hl-item.flash{background:var(--accent-soft)}
+    .hl-bar{width:4px;border-radius:2px;flex-shrink:0;margin-top:2px}
+    .hl-body{flex:1;min-width:0}
+    .hl-page{font-size:11px;color:var(--ink-soft);margin-bottom:3px}
+    .hl-text{font-size:13px;line-height:1.45}
+    .hl-note{margin-top:7px;width:100%;font-size:12px;font-family:var(--sans);padding:6px 8px;border:1px solid var(--line);border-radius:7px;resize:vertical;min-height:34px;outline:none;background:#fff}
+    .hl-note:focus{border-color:var(--accent)}
+    .hl-actions{display:flex;gap:8px;margin-top:6px}
+    .hl-actions button{background:none;border:none;color:var(--ink-soft);font-size:11px;cursor:pointer;padding:0;text-decoration:underline}
+    .hl-actions button:hover{color:#B4433A}
+    .empty-sidebar{padding:22px 18px;font-size:13px;color:var(--ink-soft);line-height:1.65}
+
+    .toc-entry{display:flex;align-items:baseline;gap:8px;padding:9px 14px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px;line-height:1.4}
+    .toc-entry:hover{background:var(--accent-soft)}
+    .toc-title{flex:1}
+    .toc-entry.d0{font-weight:600}
+    .toc-entry.d1,.toc-entry.d2{color:var(--ink-soft);font-size:12px}
+
+    /* ---- FLASHCARDS 3D ---- */
+    .fc-container{padding:16px;display:flex;flex-direction:column;gap:14px}
+    .fc-nav{display:flex;align-items:center;justify-content:center;gap:14px}
+    .fc-nav-btn{background:var(--accent-soft);border:none;color:var(--ink);width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center}
+    .fc-nav-btn:hover{background:var(--accent);color:#fff}
+    .fc-count{font-size:13px;color:var(--ink-soft);min-width:50px;text-align:center}
+    .fc-card{perspective:1200px;cursor:pointer;min-height:190px}
+    .fc-inner{width:100%;min-height:190px;position:relative;transform-style:preserve-3d;transition:transform .55s cubic-bezier(.4,0,.2,1)}
+    .fc-card.flipped .fc-inner{transform:rotateY(180deg)}
+    .fc-front,.fc-back{position:absolute;inset:0;backface-visibility:hidden;border-radius:14px;padding:20px 18px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+    .fc-front{background:var(--spine);color:var(--spine-text)}
+    .fc-back{background:#fff;border:1px solid var(--line);transform:rotateY(180deg);overflow-y:auto;justify-content:flex-start;align-items:flex-start}
+    .fc-term{font-family:var(--serif);font-style:italic;font-size:22px;text-align:center;line-height:1.3}
+    .fc-tap-hint{font-size:11px;opacity:.4;margin-top:10px}
+    .fc-back-text{font-size:13px;line-height:1.6;color:var(--ink);white-space:pre-wrap;word-break:break-word}
+    .fc-delete-btn{background:none;border:1px solid var(--line);color:var(--ink-soft);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;align-self:center}
+    .fc-delete-btn:hover{border-color:#B4433A;color:#B4433A}
+
+    /* ---- CHAT ---- */
+    .chat-panel{display:flex;flex-direction:column;height:100%}
+    .thread-bar{display:flex;align-items:center;gap:6px;padding:7px 10px;border-bottom:1px solid var(--line);flex-shrink:0}
+    .thread-bar select{flex:1;font-size:12px;font-family:var(--sans);border:1px solid var(--line);border-radius:6px;padding:5px 7px;background:#fff;color:var(--ink);cursor:pointer;outline:none;min-width:0}
+    .thread-btn{background:none;border:1px solid var(--line);color:var(--ink-soft);width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .thread-btn:hover{background:var(--accent-soft);border-color:var(--accent)}
+    .thread-btn.danger:hover{background:rgba(180,67,58,.1);border-color:#B4433A;color:#B4433A}
+    .chat-header-bar{display:flex;justify-content:space-between;align-items:center;padding:7px 12px;border-bottom:1px solid var(--line);flex-shrink:0}
+    .chat-header-bar span{font-size:12px;color:var(--ink-soft)}
+    .chat-action-btn{background:none;border:none;color:var(--ink-soft);font-size:11px;cursor:pointer;text-decoration:underline}
+    .chat-action-btn.danger:hover{color:#B4433A}
+    .chat-key-setup{padding:22px 18px;font-size:13px;color:var(--ink-soft);line-height:1.65}
+    .chat-key-setup strong{color:var(--ink)}
+    .chat-key-setup a{color:var(--accent)}
+    .chat-key-input{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:var(--r);font-size:13px;font-family:var(--sans);margin:12px 0 10px;outline:none}
+    .chat-key-input:focus{border-color:var(--accent)}
+    .chat-messages{flex:1;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:10px}
+    .chat-msg{font-size:13px;line-height:1.55;padding:9px 13px;border-radius:12px;max-width:93%;white-space:pre-wrap;word-break:break-word}
+    .chat-msg.user{align-self:flex-end;background:var(--accent);color:#fff;border-radius:12px 12px 3px 12px}
+    .chat-msg.model{align-self:flex-start;background:#fff;border:1px solid var(--line);border-radius:12px 12px 12px 3px}
+    .chat-msg.pending{color:var(--ink-soft);font-style:italic;background:#fff;border:1px solid var(--line)}
+    .chat-empty{padding:22px 18px;font-size:13px;color:var(--ink-soft);line-height:1.65}
+    .chat-input-row{display:flex;gap:7px;padding:10px;border-top:1px solid var(--line);flex-shrink:0}
+    .chat-textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:var(--r);padding:8px 11px;font-family:var(--sans);font-size:13px;min-height:38px;max-height:100px;outline:none;line-height:1.4}
+    .chat-textarea:focus{border-color:var(--accent)}
+    .chat-send-btn{background:var(--accent);color:#fff;border:none;border-radius:var(--r);padding:0 14px;cursor:pointer;font-size:13px;align-self:flex-end;height:38px}
+    .chat-send-btn:hover{background:var(--accent-h)}
+    .chat-send-btn:disabled{opacity:.45;cursor:not-allowed}
+
+    /* ---- PANEL FLOTANTE de explicación (NO bloquea lectura) ---- */
+    .explain-panel{position:fixed;bottom:20px;right:20px;width:420px;max-height:70vh;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 16px 60px rgba(0,0,0,.22);z-index:100;display:flex;flex-direction:column;animation:panelIn .25s ease}
+    @keyframes panelIn{from{transform:translateY(30px) scale(.96);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
+    .explain-panel-header{display:flex;justify-content:space-between;align-items:flex-start;padding:16px 18px 12px;border-bottom:1px solid var(--line);flex-shrink:0}
+    .explain-panel-term{font-family:var(--serif);font-style:italic;font-size:18px;color:var(--ink);font-weight:400;line-height:1.25;flex:1;margin-right:10px}
+    .explain-panel-page{font-size:11px;color:var(--ink-soft);margin-top:3px}
+    .explain-panel-close{background:none;border:1px solid var(--line);color:var(--ink-soft);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .explain-panel-close:hover{background:var(--accent-soft);color:var(--ink)}
+    .explain-panel-body{flex:1;overflow-y:auto;padding:16px 18px;font-size:14px;line-height:1.7;color:var(--ink)}
+    .explain-panel-body .explain-loading{display:flex;align-items:center;gap:12px;color:var(--ink-soft);font-size:13px;padding:10px 0}
+    .explain-panel-body .spinner{width:22px;height:22px;border-width:2px}
+    .explain-panel-body .explain-text{white-space:pre-wrap;word-break:break-word}
+    .explain-panel-footer{display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--line);flex-shrink:0}
+    .epf-btn{flex:1;padding:9px 10px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;text-align:center;border:1px solid var(--line);background:#fff;color:var(--ink);transition:all .12s}
+    .epf-btn:hover{background:var(--accent-soft);border-color:var(--accent)}
+    .epf-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .epf-btn.primary:hover{background:var(--accent-h)}
+    .epf-btn:disabled{opacity:.4;cursor:not-allowed}
+    @media(max-width:520px){.explain-panel{left:10px;right:10px;bottom:10px;width:auto}}
+  </style>
+</head>
+<body>
 <div id="app-root"></div>
-<style>
-  :root{
-    --paper:#F3EFE6; --ink:#262421; --ink-soft:#5B564E;
-    --spine:#201E1B; --spine-text:#F3EFE6; --accent:#3F6E63; --accent-soft:#DCE7E3;
-    --line:#DDD5C4; --sidebar-bg:#FBF9F4;
-    --serif: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
-    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  }
-  *{box-sizing:border-box;}
-  #app-root{ font-family: var(--sans); color: var(--ink); background: var(--paper); min-height:100vh; display:flex; flex-direction:column; }
-
-  /* ---- centered card screens (connect / login / library) ---- */
-  .screen{ flex:1; display:flex; align-items:center; justify-content:center; padding:24px; }
-  .card{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:28px; width:100%; max-width:420px; box-shadow:0 8px 28px rgba(38,36,33,0.08); }
-  .card h1{ font-family:var(--serif); font-style:italic; font-weight:400; font-size:24px; margin:0 0 6px; }
-  .card p.hint{ color:var(--ink-soft); font-size:13px; margin:0 0 18px; line-height:1.5; }
-  .field{ margin-bottom:12px; }
-  .field label{ display:block; font-size:12px; color:var(--ink-soft); margin-bottom:4px; }
-  .field input{ width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-size:14px; font-family:var(--sans); }
-  .btn-primary{
-    width:100%; background:var(--accent); color:#fff; border:none; padding:11px; border-radius:8px;
-    font-size:14px; cursor:pointer; margin-top:4px;
-  }
-  .btn-link{ background:none; border:none; color:var(--accent); font-size:13px; cursor:pointer; padding:0; text-decoration:underline; margin-top:12px; }
-  .error-msg{ color:#B4433A; font-size:13px; margin-top:8px; }
-  .ok-msg{ color:var(--accent); font-size:13px; margin-top:8px; }
-
-  /* ---- library ---- */
-  .library-wrap{ flex:1; padding:32px 20px; max-width:720px; margin:0 auto; width:100%; }
-  .library-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
-  .library-header h1{ font-family:var(--serif); font-style:italic; font-weight:400; font-size:26px; margin:0; }
-  .upload-btn{ background:var(--accent); color:#fff; border:none; padding:9px 16px; border-radius:999px; font-size:13px; cursor:pointer; }
-  .upload-btn input{ display:none; }
-  .doc-list{ display:flex; flex-direction:column; gap:10px; }
-  .doc-item{
-    display:flex; justify-content:space-between; align-items:center; background:#fff; border:1px solid var(--line);
-    border-radius:10px; padding:14px 16px; cursor:pointer;
-  }
-  .doc-item:hover{ background: var(--accent-soft); }
-  .doc-title{ font-size:14px; }
-  .doc-meta{ font-size:12px; color:var(--ink-soft); }
-  .empty-lib{ color:var(--ink-soft); font-size:14px; text-align:center; padding:40px 0; }
-  .logout-link{ background:none; border:none; color:var(--ink-soft); font-size:12px; cursor:pointer; text-decoration:underline; }
-
-  /* ---- toolbar ---- */
-  .spine{ background:var(--spine); color:var(--spine-text); display:flex; align-items:center; gap:14px; padding:10px 16px; flex-wrap:wrap; position:sticky; top:0; z-index:20; }
-  .brand{ font-family:var(--serif); font-style:italic; font-size:18px; margin-right:6px; white-space:nowrap; cursor:pointer; }
-  .spine button{
-    background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.18); color:var(--spine-text);
-    padding:7px 12px; border-radius:999px; font-size:13px; cursor:pointer;
-  }
-  .spine button:hover{ background:rgba(255,255,255,0.18); }
-  .spine button:disabled{ opacity:0.35; cursor:not-allowed; }
-  .pagectl{ display:flex; align-items:center; gap:6px; font-size:13px; }
-  .pagectl input{ width:46px; text-align:center; padding:5px; border-radius:6px; border:1px solid rgba(255,255,255,0.25); background:rgba(255,255,255,0.08); color:var(--spine-text); }
-  .spacer{ flex:1; }
-  .sync-dot{ width:7px; height:7px; border-radius:50%; background:#7FAE8C; opacity:0.9; }
-  .sync-dot.saving{ background:#E9B949; }
-
-  /* ---- reader ---- */
-  .workspace{ flex:1; display:flex; min-height:0; }
-  .stage{ flex:1; overflow:auto; display:flex; justify-content:center; padding:32px 16px; }
-  .page-frame{ display:flex; gap:10px; align-items:flex-start; }
-  .page-wrap{ position:relative; background:#fff; box-shadow:0 6px 24px rgba(38,36,33,0.18); }
-  .highlight-layer{ position:absolute; inset:0; pointer-events:none; }
-  .hl-rect{ position:absolute; mix-blend-mode:multiply; border-radius:2px; pointer-events:auto; cursor:pointer; }
-  .textLayer{ position:absolute; inset:0; overflow:hidden; line-height:1; opacity:1; transform-origin:0 0; }
-  .textLayer span, .textLayer br{ color:transparent; position:absolute; white-space:pre; cursor:text; transform-origin:0% 0%; }
-  .textLayer ::selection{ background:rgba(63,110,99,0.3); }
-  .selection-toolbar{
-    position:absolute; display:flex; gap:6px; align-items:center; background:var(--spine); padding:6px 8px;
-    border-radius:999px; box-shadow:0 6px 18px rgba(0,0,0,0.25); z-index:30; transform:translate(-50%,-100%);
-  }
-  .selection-toolbar .swatch-dot{ width:18px; height:18px; border-radius:50%; cursor:pointer; border:2px solid transparent; }
-  .selection-toolbar .swatch-dot:hover{ transform:scale(1.15); }
-  .selection-toolbar::after{
-    content:''; position:absolute; left:50%; bottom:-5px; transform:translateX(-50%);
-    border-width:5px 5px 0 5px; border-style:solid; border-color:var(--spine) transparent transparent transparent;
-  }
-  .margin-strip{ width:14px; align-self:stretch; position:relative; border-left:1px dashed var(--line); }
-  .tick{ position:absolute; left:3px; width:8px; height:3px; border-radius:2px; cursor:pointer; }
-
-  .sidebar{ width:280px; background:var(--sidebar-bg); border-left:1px solid var(--line); overflow-y:auto; flex-shrink:0; }
-  .sidebar.hidden{ display:none; }
-  .sidebar h2{ font-family:var(--serif); font-style:italic; font-weight:400; font-size:17px; padding:16px 16px 8px; margin:0; }
-  .hl-item{ padding:10px 14px; border-bottom:1px solid var(--line); display:flex; gap:8px; cursor:pointer; }
-  .hl-item:hover{ background:var(--accent-soft); }
-  .hl-item.flash{ background:var(--accent-soft); }
-  .hl-bar{ width:4px; border-radius:2px; flex-shrink:0; }
-  .hl-body{ flex:1; min-width:0; }
-  .hl-page{ font-size:11px; color:var(--ink-soft); margin-bottom:2px; }
-  .hl-text{ font-size:13px; line-height:1.4; }
-  .hl-note{ margin-top:6px; width:100%; font-size:12px; font-family:var(--sans); padding:6px; border:1px solid var(--line); border-radius:6px; resize:vertical; min-height:32px; }
-  .hl-actions{ display:flex; gap:8px; margin-top:6px; }
-  .hl-actions button{ background:none; border:none; color:var(--ink-soft); font-size:11px; cursor:pointer; padding:0; text-decoration:underline; }
-  .empty-sidebar{ padding:18px; font-size:13px; color:var(--ink-soft); }
-
-  /* ---- sidebar tabs + AI chat ---- */
-  .sidebar-tabs{ display:flex; border-bottom:1px solid var(--line); }
-  .sidebar-tabs button{
-    flex:1; background:none; border:none; padding:12px 8px; font-size:13px; cursor:pointer;
-    color:var(--ink-soft); border-bottom:2px solid transparent;
-  }
-  .sidebar-tabs button.active{ color:var(--ink); border-bottom-color:var(--accent); font-weight:600; }
-  .chat-panel{ display:flex; flex-direction:column; height:calc(100% - 45px); }
-  .chat-key-setup{ padding:16px; font-size:13px; color:var(--ink-soft); }
-  .chat-key-setup input{ width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:13px; margin:8px 0; }
-  .chat-key-setup a{ color:var(--accent); }
-  .chat-messages{ flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:10px; }
-  .chat-msg{ font-size:13px; line-height:1.5; padding:8px 12px; border-radius:12px; max-width:92%; white-space:pre-wrap; }
-  .chat-msg.user{ align-self:flex-end; background:var(--accent); color:#fff; }
-  .chat-msg.model{ align-self:flex-start; background:#fff; border:1px solid var(--line); }
-  .chat-msg.pending{ color: var(--ink-soft); font-style:italic; }
-  .chat-input-row{ display:flex; gap:6px; padding:10px; border-top:1px solid var(--line); }
-  .chat-input-row textarea{
-    flex:1; resize:none; border:1px solid var(--line); border-radius:8px; padding:8px; font-family:var(--sans); font-size:13px; min-height:38px;
-  }
-  .chat-input-row button{ background:var(--accent); color:#fff; border:none; border-radius:8px; padding:0 14px; cursor:pointer; font-size:13px; }
-  .chat-empty{ padding:18px; font-size:13px; color:var(--ink-soft); line-height:1.5; }
-
-  .selection-toolbar .explain-btn{
-    background:rgba(255,255,255,0.12); color:var(--spine-text); border:1px solid rgba(255,255,255,0.3);
-    border-radius:999px; padding:3px 10px; font-size:12px; cursor:pointer; white-space:nowrap;
-  }
-  .selection-toolbar .divider{ width:1px; height:16px; background:rgba(255,255,255,0.25); }
-</style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
-(function(){
-  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-  const COLORS = [
-    {name:'amber', hex:'#E9B949'}, {name:'sage', hex:'#7FAE8C'},
-    {name:'rose', hex:'#D98CAA'}, {name:'sky', hex:'#7CB2D9'},
-  ];
+'use strict';
 
-  const state = {
-    view: 'connect',        // connect -> auth -> library -> reader
-    sb: null, session: null,
-    authMode: 'login', authError: '',
-    documents: [], currentDoc: null,
-    pdf: null, pageNum: 1, numPages: 0, scale: 1.25,
-    highlights: [], sidebarOpen: true, saving: false,
-    sidebarTab: 'highlights', geminiKey: '', chatMessages: [], docFullText: '', chatBusy: false,
-  };
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-  const root = document.getElementById('app-root');
-  const uid = () => 'h' + Math.random().toString(36).slice(2,10);
-  const escapeHtml = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const COLORS = [
+  { name:'ámbar', hex:'#E9B949' }, { name:'salvia', hex:'#7FAE8C' },
+  { name:'rosa',  hex:'#D98CAA' }, { name:'cielo',  hex:'#7CB2D9' },
+];
+const GEMINI_KEY_LS  = 'readily_gemini_key';
+const SB_URL_LS      = 'readily_sb_url';
+const SB_KEY_LS      = 'readily_sb_key';
+const GEMINI_API     = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+const MAX_CTX        = 30;
 
-  function render(){
-    if (state.view === 'connect') return renderConnect();
-    if (state.view === 'auth') return renderAuth();
-    if (state.view === 'library') return renderLibrary();
-    if (state.view === 'reader') return renderReaderShell();
-  }
+const state = {
+  view:'connect', sb:null, session:null,
+  authMode:'login', authError:'',
+  documents:[], currentDoc:null,
+  pdf:null, pageNum:1, numPages:0, scale:1.25,
+  highlights:[], sidebarOpen:true, saving:false,
+  sidebarTab:'highlights',
+  geminiKey: localStorage.getItem(GEMINI_KEY_LS) || '',
+  chatMessages:[], docFullText:'', chatBusy:false,
+  chatThreads:[], currentThreadId:null,
+  searchQuery:'', searchResults:[], searchResultIdx:-1,
+  searchBarOpen:false, searchIndex:[],
+  tocEntries:[],
+  flashcards:[], flashcardIdx:0,
+  // Explain panel state — persiste mientras lees
+  explainTerm:'', explainText:'', explainPage:0, explainVisible:false, explainLoading:false,
+};
 
-  // ---------------- CONNECT (paste your Supabase project URL + anon key) ----------------
-  function renderConnect(){
-    root.innerHTML = `
-      <div class="screen"><div class="card">
-        <h1>Conecta tu nube</h1>
-        <p class="hint">Pega los datos de tu proyecto Supabase (Settings → API). Solo se usan en tu navegador, en esta sesión; no se guardan en ningún lado.<br><br>
-        <strong>Nota:</strong> esto no conectará dentro de la vista previa del chat (bloquea la librería de Supabase). Abre este archivo directamente en tu navegador para probarlo.</p>
-        <div class="field"><label>Project URL</label><input id="sb-url" placeholder="https://xxxx.supabase.co"></div>
-        <div class="field"><label>Anon public key</label><input id="sb-key" placeholder="eyJhbGciOi..."></div>
-        <button class="btn-primary" id="connect-btn">Conectar</button>
-        <div class="error-msg" id="connect-error"></div>
-      </div></div>`;
-    document.getElementById('connect-btn').addEventListener('click', async () => {
-      const url = document.getElementById('sb-url').value.trim();
-      const key = document.getElementById('sb-key').value.trim();
-      const errEl = document.getElementById('connect-error');
-      if (!url || !key){ errEl.textContent = 'Completa ambos campos.'; return; }
-      try{
-        state.sb = window.supabase.createClient(url, key);
-        const { data: { session } } = await state.sb.auth.getSession();
-        state.session = session;
-        state.view = session ? 'library' : 'auth';
-        if (session) await loadDocuments();
-        render();
-      }catch(err){
-        errEl.textContent = 'No se pudo conectar: ' + err.message;
+const root = document.getElementById('app-root');
+const uid  = () => 'h' + Math.random().toString(36).slice(2, 10);
+const esc  = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// ---- Limpiar texto seleccionado del PDF ----
+function cleanSelectedText(raw, pageNum) {
+  // 1. Normalizar espacios y puntos sueltos
+  let t = raw.replace(/\s+/g, ' ').trim();
+  // 2. Quitar puntos aislados al inicio/final (artefactos de PDF)
+  t = t.replace(/^[.\s]+/, '').replace(/[.\s]+$/, '');
+  // 3. Si el texto es muy corto y parece cortado, intentar buscar la palabra completa en el índice
+  if (t.length < 20 && state.searchIndex.length > 0) {
+    const pageData = state.searchIndex.find(p => p.page === pageNum);
+    if (pageData) {
+      const idx = pageData.text.toLowerCase().indexOf(t.toLowerCase());
+      if (idx !== -1) {
+        // Expandir a la palabra completa (bordes de palabra)
+        let start = idx, end = idx + t.length;
+        while (start > 0 && /\S/.test(pageData.text[start - 1])) start--;
+        while (end < pageData.text.length && /\S/.test(pageData.text[end])) end++;
+        t = pageData.text.slice(start, end).trim();
       }
-    });
+    }
   }
+  return t;
+}
 
-  // ---------------- AUTH (email + password) ----------------
-  function renderAuth(){
-    const isLogin = state.authMode === 'login';
-    root.innerHTML = `
-      <div class="screen"><div class="card">
-        <h1>${isLogin ? 'Inicia sesión' : 'Crea tu cuenta'}</h1>
-        <p class="hint">Tus documentos y subrayados quedan ligados a esta cuenta y protegidos por fila (RLS) en tu base de datos.</p>
-        <div class="field"><label>Correo</label><input id="auth-email" type="email"></div>
-        <div class="field"><label>Contraseña</label><input id="auth-pass" type="password"></div>
-        <button class="btn-primary" id="auth-btn">${isLogin ? 'Entrar' : 'Registrarme'}</button>
-        <div class="error-msg" id="auth-error">${state.authError||''}</div>
-        <button class="btn-link" id="auth-switch">${isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia sesión'}</button>
-      </div></div>`;
-    document.getElementById('auth-switch').addEventListener('click', () => {
-      state.authMode = isLogin ? 'signup' : 'login'; state.authError=''; render();
-    });
-    document.getElementById('auth-btn').addEventListener('click', async () => {
-      const email = document.getElementById('auth-email').value.trim();
-      const password = document.getElementById('auth-pass').value;
-      const errEl = document.getElementById('auth-error');
-      errEl.textContent = '';
-      const fn = isLogin ? 'signInWithPassword' : 'signUp';
-      const { data, error } = await state.sb.auth[fn]({ email, password });
-      if (error){ errEl.textContent = error.message; return; }
-      if (!isLogin && !data.session){
-        errEl.className = 'ok-msg';
-        errEl.textContent = 'Cuenta creada. Revisa tu correo para confirmar, luego inicia sesión.';
-        state.authMode = 'login';
-        return;
-      }
-      state.session = data.session;
-      state.view = 'library';
-      await loadDocuments();
+// ============================================================
+function render() {
+  if (state.view === 'connect') return renderConnect();
+  if (state.view === 'auth')    return renderAuth();
+  if (state.view === 'library') return renderLibrary();
+  if (state.view === 'reader')  return renderReaderShell();
+  renderLoading();
+}
+
+function renderLoading(label = 'Cargando…') {
+  root.innerHTML = `<div class="loading-screen"><div class="spinner"></div><span class="loading-label">${esc(label)}</span></div>`;
+}
+
+// ============================================================
+// Connect
+// ============================================================
+function renderConnect() {
+  root.innerHTML = `
+    <div class="screen"><div class="card">
+      <div class="card-logo">Readily</div>
+      <div class="card-tagline">Tu lector personal de PDFs</div>
+      <h2>Conecta tu nube</h2>
+      <p class="card-hint">Pega los datos de tu proyecto Supabase (Settings → API). Se guardan en tu navegador.</p>
+      <div class="field"><label>Project URL</label><input id="sb-url" placeholder="https://xxxx.supabase.co" value="${esc(localStorage.getItem(SB_URL_LS)||'')}"></div>
+      <div class="field"><label>Anon public key</label><input id="sb-key" placeholder="eyJhbGciOi…" value="${esc(localStorage.getItem(SB_KEY_LS)||'')}"></div>
+      <button class="btn-primary" id="connect-btn">Conectar y recordar</button>
+      <div class="error-msg" id="connect-error"></div>
+    </div></div>`;
+  document.getElementById('connect-btn').onclick = async () => {
+    const url = document.getElementById('sb-url').value.trim();
+    const key = document.getElementById('sb-key').value.trim();
+    const err = document.getElementById('connect-error');
+    if (!url || !key) { err.textContent = 'Completa ambos campos.'; return; }
+    try {
+      state.sb = window.supabase.createClient(url, key);
+      const { data: { session } } = await state.sb.auth.getSession();
+      localStorage.setItem(SB_URL_LS, url);
+      localStorage.setItem(SB_KEY_LS, key);
+      state.session = session;
+      state.view = session ? 'library' : 'auth';
+      if (session) await loadDocuments();
       render();
-    });
-  }
+    } catch (e) { err.textContent = 'Error: ' + e.message; }
+  };
+}
 
-  // ---------------- LIBRARY ----------------
-  async function loadDocuments(){
-    const { data, error } = await state.sb.from('documents').select('*').order('created_at', {ascending:false});
-    state.documents = error ? [] : data;
-  }
+// ============================================================
+// Auth
+// ============================================================
+function renderAuth() {
+  const isLogin = state.authMode === 'login';
+  root.innerHTML = `
+    <div class="screen"><div class="card">
+      <div class="card-logo">Readily</div>
+      <div class="card-tagline">Tu lector personal de PDFs</div>
+      <h2>${isLogin ? 'Inicia sesión' : 'Crea tu cuenta'}</h2>
+      <p class="card-hint">Tus documentos quedan protegidos en tu nube personal.</p>
+      <div class="field"><label>Correo</label><input id="auth-email" type="email" placeholder="tu@correo.com"></div>
+      <div class="field"><label>Contraseña</label><input id="auth-pass" type="password" placeholder="••••••••"></div>
+      <button class="btn-primary" id="auth-btn">${isLogin ? 'Entrar' : 'Crear cuenta'}</button>
+      <div id="auth-msg" class="${state.authError?.startsWith('Cuenta') ? 'ok-msg' : 'error-msg'}">${state.authError || ''}</div>
+      <button class="btn-link" id="auth-switch">${isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia sesión'}</button>
+    </div></div>`;
+  document.getElementById('auth-switch').onclick = () => { state.authMode = isLogin ? 'signup' : 'login'; state.authError = ''; render(); };
+  document.getElementById('auth-btn').onclick = async () => {
+    const email = document.getElementById('auth-email').value.trim();
+    const pass = document.getElementById('auth-pass').value;
+    const msg = document.getElementById('auth-msg');
+    msg.textContent = '';
+    const { data, error } = await state.sb.auth[isLogin ? 'signInWithPassword' : 'signUp']({ email, password: pass });
+    if (error) { msg.className = 'error-msg'; msg.textContent = error.message; return; }
+    if (!isLogin && !data.session) { state.authError = 'Cuenta creada — revisa tu correo.'; state.authMode = 'login'; render(); return; }
+    state.session = data.session; state.view = 'library'; await loadDocuments(); render();
+  };
+}
 
-  function renderLibrary(){
-    root.innerHTML = `
-      <div class="library-wrap">
-        <div class="library-header">
-          <h1>Tu biblioteca</h1>
-          <div style="display:flex; gap:10px; align-items:center;">
-            <label class="upload-btn">Subir PDF<input id="upload-input" type="file" accept="application/pdf"></label>
-            <button class="logout-link" id="logout-btn">Cerrar sesión</button>
-          </div>
+// ============================================================
+// Library
+// ============================================================
+async function loadDocuments() {
+  const { data } = await state.sb.from('documents').select('*').order('created_at', { ascending: false });
+  state.documents = data || [];
+}
+
+function renderLibrary() {
+  root.innerHTML = `
+    <div class="library-wrap">
+      <div class="library-header">
+        <h1 class="library-title">Readily<span>Tu biblioteca personal</span></h1>
+        <div class="library-actions">
+          <label class="upload-btn">+ Subir PDF<input id="upload-input" type="file" accept="application/pdf" multiple></label>
+          <button class="logout-link" id="logout-btn">Cerrar sesión</button>
         </div>
-        <div class="doc-list" id="doc-list">
-          ${state.documents.length === 0 ? `<div class="empty-lib">Aún no subes ningún PDF. Empieza subiendo el primero.</div>` :
-            state.documents.map(d => `
-              <div class="doc-item" data-id="${d.id}">
-                <div><div class="doc-title">${escapeHtml(d.title)}</div><div class="doc-meta">${d.num_pages ? d.num_pages+' páginas' : ''}</div></div>
-                <span>Abrir →</span>
-              </div>`).join('')
-          }
-        </div>
-      </div>`;
-    document.getElementById('upload-input').addEventListener('change', onUploadPdf);
-    document.getElementById('logout-btn').addEventListener('click', async () => {
-      await state.sb.auth.signOut();
-      state.session = null; state.view = 'auth'; render();
-    });
-    document.querySelectorAll('.doc-item').forEach(el => {
-      el.addEventListener('click', () => openDocument(el.dataset.id));
-    });
+      </div>
+      <div class="upload-progress" id="upload-progress"></div>
+      <div class="doc-list" id="doc-list">
+        ${state.documents.length === 0
+          ? '<div class="empty-lib">📚<br><br>Tu biblioteca está vacía.<br>Sube tu primer PDF.</div>'
+          : state.documents.map(d => `
+            <div class="doc-item" data-id="${d.id}">
+              <div><div class="doc-title">${esc(d.title)}</div><div class="doc-meta">${d.num_pages||''} páginas</div></div>
+              <span class="doc-arrow">→</span>
+            </div>`).join('')}
+      </div>
+      <div style="text-align:center;margin-top:36px"><button class="disconnect-btn" id="disc-btn">Cambiar base de datos</button></div>
+    </div>`;
+  document.getElementById('upload-input').onchange = onUpload;
+  document.getElementById('logout-btn').onclick = async () => { await state.sb.auth.signOut(); state.session=null; state.view='auth'; render(); };
+  document.getElementById('disc-btn').onclick = () => { localStorage.removeItem(SB_URL_LS); localStorage.removeItem(SB_KEY_LS); state.sb=null; state.session=null; state.view='connect'; render(); };
+  document.querySelectorAll('.doc-item').forEach(el => el.onclick = () => openDocument(el.dataset.id));
+}
+
+async function onUpload(e) {
+  const files = Array.from(e.target.files); if (!files.length) return;
+  const prog = document.getElementById('upload-progress'); prog.style.display = 'block';
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i]; prog.textContent = `Subiendo ${i+1}/${files.length}: ${f.name}…`;
+    const path = `${state.session.user.id}/${Date.now()}_${f.name}`;
+    const { error } = await state.sb.storage.from('pdfs').upload(path, f);
+    if (error) { alert('Error: ' + error.message); continue; }
+    const buf = await f.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    await state.sb.from('documents').insert({ title: f.name.replace(/\.pdf$/i,''), storage_path: path, num_pages: pdf.numPages, user_id: state.session.user.id });
   }
+  prog.style.display = 'none'; await loadDocuments(); renderLibrary();
+}
 
-  async function onUploadPdf(e){
-    const file = e.target.files[0];
-    if (!file) return;
-    const userId = state.session.user.id;
-    const path = `${userId}/${Date.now()}_${file.name}`;
-    const { error: upErr } = await state.sb.storage.from('pdfs').upload(path, file);
-    if (upErr){ alert('Error subiendo el archivo: ' + upErr.message); return; }
-    const buf = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({data: buf}).promise;
-    const { error: dbErr } = await state.sb.from('documents').insert({
-      title: file.name.replace(/\.pdf$/i,''), storage_path: path, num_pages: pdf.numPages
-    });
-    if (dbErr){ alert('Error guardando metadatos: ' + dbErr.message); return; }
-    await loadDocuments();
-    renderLibrary();
-  }
-
-  async function openDocument(docId){
-    const doc = state.documents.find(d => d.id === docId);
-    if (!doc) return;
-    state.currentDoc = doc;
-
-    const { data: fileData, error: dlErr } = await state.sb.storage.from('pdfs').download(doc.storage_path);
-    if (dlErr){ alert('Error descargando el PDF: ' + dlErr.message); return; }
-    const buf = await fileData.arrayBuffer();
-    state.pdf = await pdfjsLib.getDocument({data: buf}).promise;
+// ============================================================
+// Open document
+// ============================================================
+async function openDocument(docId) {
+  renderLoading('Abriendo documento…');
+  const doc = state.documents.find(d => d.id === docId);
+  if (!doc) { state.view = 'library'; render(); return; }
+  state.currentDoc = doc;
+  try {
+    const { data: fd, error: dlE } = await state.sb.storage.from('pdfs').download(doc.storage_path);
+    if (dlE) throw dlE;
+    state.pdf = await pdfjsLib.getDocument({ data: await fd.arrayBuffer() }).promise;
     state.numPages = state.pdf.numPages;
 
-    const { data: progress } = await state.sb.from('reading_progress')
-      .select('page').eq('document_id', docId).maybeSingle();
-    state.pageNum = progress?.page || 1;
+    const { data: prog } = await state.sb.from('reading_progress').select('page').eq('document_id', docId).maybeSingle();
+    state.pageNum = prog?.page || 1;
 
     const { data: hls } = await state.sb.from('highlights').select('*').eq('document_id', docId);
     state.highlights = (hls||[]).map(h => ({ id:h.id, page:h.page, rects:h.rects, color:h.color, text:h.text, note:h.note||'' }));
 
-    state.chatMessages = [];
+    // Threads
+    let threadsError = null;
+    let { data: threads, error: tErr } = await state.sb.from('chat_threads').select('*').eq('document_id', docId).order('created_at');
+    threadsError = tErr;
+    if (threads && threads.length > 0) {
+      state.chatThreads = threads; state.currentThreadId = threads[0].id;
+    } else {
+      const { data: nt, error: ntErr } = await state.sb.from('chat_threads').insert({ document_id: docId, title: 'Chat General', user_id: state.session.user.id }).select().single();
+      if (ntErr) threadsError = ntErr;
+      if (nt) {
+        state.chatThreads = [nt]; state.currentThreadId = nt.id;
+        await state.sb.from('chat_messages').update({ thread_id: nt.id }).eq('document_id', docId).is('thread_id', null);
+      } else {
+        state.chatThreads = []; state.currentThreadId = null;
+      }
+    }
+    if (threadsError) {
+      console.warn("Supabase chat_threads warning:", threadsError);
+      alert("Aviso de Base de Datos (Chats):\n" + threadsError.message + "\n\n¿Ejecutaste el SQL de migración en Supabase?");
+    }
+    await loadThreadMsgs(state.currentThreadId);
+
+    state.tocEntries = (await state.pdf.getOutline()) || [];
+
+    // Flashcards (tabla puede no existir aún)
+    try {
+      const { data: fcs } = await state.sb.from('flashcards').select('*').eq('document_id', docId).order('created_at');
+      state.flashcards = fcs || [];
+    } catch (_) { state.flashcards = []; }
+    state.flashcardIdx = 0;
+
+    state.searchQuery=''; state.searchResults=[]; state.searchResultIdx=-1; state.searchBarOpen=false; state.searchIndex=[];
+    state.explainVisible=false; state.explainText=''; state.explainTerm='';
+
+    renderLoading('Indexando texto…');
     state.docFullText = await extractFullText(state.pdf);
+    state.view = 'reader'; renderReaderShell();
+  } catch (err) { alert('Error: ' + err.message); state.view = 'library'; render(); }
+}
 
-    state.view = 'reader';
-    renderReaderShell();
+async function loadThreadMsgs(threadId) {
+  if (!threadId) { state.chatMessages = []; return; }
+  const { data } = await state.sb.from('chat_messages').select('role,content').eq('thread_id', threadId).order('created_at');
+  state.chatMessages = (data||[]).map(m => ({ role: m.role, text: m.content }));
+}
+
+async function extractFullText(pdf) {
+  const MAX = 400_000; let out = ''; state.searchIndex = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const p = await pdf.getPage(i); const c = await p.getTextContent();
+    const t = c.items.map(it => it.str).join(' ');
+    state.searchIndex.push({ page: i, text: t });
+    out += `\n\n[Página ${i}]\n${t}`;
+    if (out.length > MAX) { out = out.slice(0, MAX) + '\n[…truncado…]'; break; }
   }
+  return out;
+}
 
-  // Pulls the text of every page so the AI chat has context of the whole document.
-  // Capped to keep requests fast/cheap; still far more than most single chapters need.
-  async function extractFullText(pdf){
-    const MAX_CHARS = 400000;
-    let out = '';
-    for (let i = 1; i <= pdf.numPages; i++){
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      const pageText = content.items.map(it => it.str).join(' ');
-      out += `\n\n[Página ${i}]\n${pageText}`;
-      if (out.length > MAX_CHARS){ out = out.slice(0, MAX_CHARS) + '\n\n[...documento truncado por longitud...]'; break; }
-    }
-    return out;
-  }
-
-  // ---------------- READER SHELL ----------------
-  function renderReaderShell(){
-    root.innerHTML = `
+// ============================================================
+// Reader shell
+// ============================================================
+function renderReaderShell() {
+  root.innerHTML = `
+    <div class="reader-header" id="reader-header">
       <div class="spine" id="spine"></div>
-      <div class="workspace">
-        <div class="stage" id="stage">
-          <div class="page-frame">
-            <div class="page-wrap" id="page-wrap"></div>
-            <div class="margin-strip" id="margin-strip"></div>
-          </div>
+      <div class="search-bar-row hidden" id="search-bar-row"></div>
+      <div id="search-results-panel"></div>
+    </div>
+    <div class="workspace">
+      <div class="stage" id="stage">
+        <div class="page-frame">
+          <div class="page-wrap" id="page-wrap"></div>
+          <div class="margin-strip" id="margin-strip"></div>
         </div>
-        <div class="sidebar ${state.sidebarOpen?'':'hidden'}" id="sidebar"></div>
-      </div>`;
-    renderToolbar();
-    renderSidebar();
-    renderPage(state.pageNum);
-  }
-
-  function renderToolbar(){
-    const spine = document.getElementById('spine');
-    spine.innerHTML = `
-      <span class="brand" id="back-to-library" title="Volver a tu biblioteca">← Lector</span>
-      <div class="pagectl">
-        <button id="prev-page" ${state.pageNum<=1?'disabled':''}>‹</button>
-        <input id="page-input" type="number" min="1" max="${state.numPages}" value="${state.pageNum}">
-        <span>/ ${state.numPages}</span>
-        <button id="next-page" ${state.pageNum>=state.numPages?'disabled':''}>›</button>
       </div>
-      <button id="zoom-out">A−</button>
-      <button id="zoom-in">A+</button>
-      <div class="spacer"></div>
-      <span class="sync-dot ${state.saving?'saving':''}" title="${state.saving?'Guardando...':'Guardado en la nube'}"></span>
-      <button id="toggle-sidebar">${state.sidebarOpen?'Ocultar notas':'Ver notas'}</button>
-    `;
-    document.getElementById('back-to-library').addEventListener('click', () => { state.view='library'; renderLibrary(); });
-    document.getElementById('prev-page').addEventListener('click', () => goToPage(state.pageNum-1));
-    document.getElementById('next-page').addEventListener('click', () => goToPage(state.pageNum+1));
-    document.getElementById('page-input').addEventListener('change', e => goToPage(parseInt(e.target.value)||1));
-    document.getElementById('zoom-in').addEventListener('click', () => { state.scale=Math.min(state.scale+0.2,3); renderPage(state.pageNum); });
-    document.getElementById('zoom-out').addEventListener('click', () => { state.scale=Math.max(state.scale-0.2,0.5); renderPage(state.pageNum); });
-    document.getElementById('toggle-sidebar').addEventListener('click', () => {
-      state.sidebarOpen = !state.sidebarOpen;
-      document.getElementById('sidebar').classList.toggle('hidden', !state.sidebarOpen);
-      renderToolbar();
-    });
-  }
+      <div class="sidebar ${state.sidebarOpen?'':'hidden'}" id="sidebar"></div>
+    </div>`;
+  renderToolbar(); renderSidebar(); renderPage(state.pageNum);
+  if (state.explainVisible) renderExplainPanel();
+}
 
-  function renderSidebar(){
-    const sidebar = document.getElementById('sidebar');
-    if (!sidebar) return;
-    sidebar.innerHTML = `
-      <div class="sidebar-tabs">
-        <button id="tab-highlights" class="${state.sidebarTab==='highlights'?'active':''}">Subrayados</button>
-        <button id="tab-chat" class="${state.sidebarTab==='chat'?'active':''}">Chat IA</button>
+// ============================================================
+// Toolbar
+// ============================================================
+function renderToolbar() {
+  const s = document.getElementById('spine'); if (!s) return;
+  s.innerHTML = `
+    <span class="brand" id="back-lib">← Readily</span><div class="spine-sep"></div>
+    <div class="pagectl">
+      <button class="spine-btn" id="pp" ${state.pageNum<=1?'disabled':''}>‹</button>
+      <input id="pi" type="number" min="1" max="${state.numPages}" value="${state.pageNum}">
+      <span class="page-total">/ ${state.numPages}</span>
+      <button class="spine-btn" id="np" ${state.pageNum>=state.numPages?'disabled':''}>›</button>
+    </div><div class="spine-sep"></div>
+    <button class="spine-btn" id="zo">A−</button>
+    <button class="spine-btn" id="zi">A+</button>
+    <button class="spine-btn ${state.searchBarOpen?'active':''}" id="st">🔍</button>
+    <div class="spacer"></div>
+    <span class="sync-dot ${state.saving?'saving':''}" title="${state.saving?'Guardando…':'Guardado'}"></span>
+    <button class="spine-btn" id="ts">${state.sidebarOpen?'Ocultar notas':'Ver notas'}</button>`;
+  document.getElementById('back-lib').onclick = () => { state.view='library'; renderLibrary(); };
+  document.getElementById('pp').onclick = () => goToPage(state.pageNum-1);
+  document.getElementById('np').onclick = () => goToPage(state.pageNum+1);
+  document.getElementById('pi').onchange = e => goToPage(parseInt(e.target.value)||1);
+  document.getElementById('zi').onclick = () => { state.scale=Math.min(state.scale+.2,3); renderPage(state.pageNum); };
+  document.getElementById('zo').onclick = () => { state.scale=Math.max(state.scale-.2,.5); renderPage(state.pageNum); };
+  document.getElementById('st').onclick = toggleSearchBar;
+  document.getElementById('ts').onclick = () => { state.sidebarOpen=!state.sidebarOpen; document.getElementById('sidebar')?.classList.toggle('hidden',!state.sidebarOpen); renderToolbar(); };
+}
+
+// ============================================================
+// Search
+// ============================================================
+function toggleSearchBar() {
+  state.searchBarOpen=!state.searchBarOpen; renderToolbar();
+  const r=document.getElementById('search-bar-row'); if(!r) return;
+  r.classList.toggle('hidden',!state.searchBarOpen);
+  if(state.searchBarOpen){renderSearchBar();setTimeout(()=>document.getElementById('si')?.focus(),40)}
+  else{state.searchResults=[];state.searchQuery='';renderSRP()}
+}
+function renderSearchBar() {
+  const r=document.getElementById('search-bar-row');if(!r)return;
+  const c=state.searchResults.length,i=state.searchResultIdx;
+  r.innerHTML=`<input class="search-input" id="si" placeholder="Buscar…" value="${esc(state.searchQuery)}">
+    <span class="search-count">${c>0?`${i+1}/${c}`:(state.searchQuery?'Sin resultados':'')}</span>
+    <button class="search-nav-btn" id="sp" ${c===0?'disabled':''}>‹</button>
+    <button class="search-nav-btn" id="sn" ${c===0?'disabled':''}>›</button>`;
+  let deb;
+  document.getElementById('si').oninput=e=>{state.searchQuery=e.target.value;clearTimeout(deb);deb=setTimeout(()=>{doSearch(state.searchQuery);renderSearchBar();renderSRP()},260)};
+  document.getElementById('si').onkeydown=e=>{if(e.key==='Escape'){state.searchBarOpen=false;toggleSearchBar()}if(e.key==='Enter')navSearch(e.shiftKey?-1:1)};
+  document.getElementById('sp').onclick=()=>navSearch(-1);
+  document.getElementById('sn').onclick=()=>navSearch(1);
+}
+function doSearch(q){
+  q=q.trim().toLowerCase();if(!q){state.searchResults=[];state.searchResultIdx=-1;return}
+  const res=[];
+  for(const{page,text}of state.searchIndex){const lc=text.toLowerCase();let p=0,m=0;while(m<3){const i=lc.indexOf(q,p);if(i===-1)break;
+    const s=Math.max(0,i-40),e=Math.min(text.length,i+q.length+60);
+    res.push({page,snippet:`${s>0?'…':''}${esc(text.slice(s,i))}<em>${esc(text.slice(i,i+q.length))}</em>${esc(text.slice(i+q.length,e))}${e<text.length?'…':''}`});
+    p=i+q.length;m++}}
+  state.searchResults=res;state.searchResultIdx=res.length>0?0:-1;
+  if(res.length>0)goToPage(res[0].page);
+}
+function navSearch(d){if(!state.searchResults.length)return;state.searchResultIdx=(state.searchResultIdx+d+state.searchResults.length)%state.searchResults.length;goToPage(state.searchResults[state.searchResultIdx].page);renderSearchBar();renderSRP()}
+function renderSRP(){const p=document.getElementById('search-results-panel');if(!p)return;if(!state.searchBarOpen||!state.searchResults.length){p.innerHTML='';return}
+  p.innerHTML=`<div class="search-results-panel">${state.searchResults.map((r,i)=>`<div class="srp-item ${i===state.searchResultIdx?'active':''}" data-i="${i}"><span class="srp-page">p.${r.page}</span><span class="srp-snippet">${r.snippet}</span></div>`).join('')}</div>`;
+  p.querySelectorAll('.srp-item').forEach(el=>el.onclick=()=>{state.searchResultIdx=+el.dataset.i;goToPage(state.searchResults[state.searchResultIdx].page);renderSearchBar();renderSRP()});
+}
+
+// ============================================================
+// Sidebar
+// ============================================================
+function renderSidebar() {
+  const sb = document.getElementById('sidebar'); if (!sb) return;
+  const hasToc = state.tocEntries.length > 0;
+  const fc = state.flashcards.length;
+  sb.innerHTML = `
+    <div class="sidebar-tabs">
+      <button id="t-hl" class="${state.sidebarTab==='highlights'?'active':''}">Subrayados</button>
+      ${hasToc?`<button id="t-toc" class="${state.sidebarTab==='toc'?'active':''}">Índice</button>`:''}
+      <button id="t-chat" class="${state.sidebarTab==='chat'?'active':''}">Chat IA</button>
+      <button id="t-fc" class="${state.sidebarTab==='flashcards'?'active':''}">Tarjetas${fc>0?` <span class="fc-badge">${fc}</span>`:''}</button>
+    </div>
+    <div class="sidebar-body" id="sb-body"></div>`;
+  document.getElementById('t-hl').onclick=()=>{state.sidebarTab='highlights';renderSidebar()};
+  if(hasToc)document.getElementById('t-toc').onclick=()=>{state.sidebarTab='toc';renderSidebar()};
+  document.getElementById('t-chat').onclick=()=>{state.sidebarTab='chat';renderSidebar()};
+  document.getElementById('t-fc').onclick=()=>{state.sidebarTab='flashcards';renderSidebar()};
+  if(state.sidebarTab==='highlights')renderHlTab();
+  else if(state.sidebarTab==='toc')renderTocTab();
+  else if(state.sidebarTab==='chat')renderChatTab();
+  else renderFcTab();
+}
+
+// ---- Highlights ----
+function renderHlTab(){
+  const b=document.getElementById('sb-body');
+  if(!state.highlights.length){b.innerHTML='<div class="empty-sidebar">Selecciona texto en el documento para crear tu primer subrayado.</div>';return}
+  const sorted=[...state.highlights].sort((a,c)=>a.page-c.page);
+  b.innerHTML=sorted.map(h=>`<div class="hl-item" data-j="${h.page}" data-id="${h.id}"><div class="hl-bar" style="background:${h.color}"></div><div class="hl-body"><div class="hl-page">Página ${h.page}</div><div class="hl-text">"${esc(h.text.length>140?h.text.slice(0,140)+'…':h.text)}"</div><textarea class="hl-note" data-nid="${h.id}" placeholder="Agregar nota…">${esc(h.note||'')}</textarea><div class="hl-actions"><button class="hl-del" data-did="${h.id}">Eliminar</button></div></div></div>`).join('');
+  b.querySelectorAll('.hl-item').forEach(it=>it.onclick=e=>{if(e.target.tagName==='TEXTAREA'||e.target.classList.contains('hl-del'))return;goToPage(+it.dataset.j)});
+  b.querySelectorAll('.hl-note').forEach(ta=>{ta.onclick=e=>e.stopPropagation();ta.onchange=async e=>{const h=state.highlights.find(x=>x.id===e.target.dataset.nid);if(!h)return;h.note=e.target.value;setSaving(true);await state.sb.from('highlights').update({note:h.note}).eq('id',h.id);setSaving(false)}});
+  b.querySelectorAll('.hl-del').forEach(bt=>bt.onclick=async e=>{e.stopPropagation();const id=bt.dataset.did;state.highlights=state.highlights.filter(h=>h.id!==id);renderSidebar();drawHL(state.pageNum);drawMS(state.pageNum);setSaving(true);await state.sb.from('highlights').delete().eq('id',id);setSaving(false)});
+}
+
+// ---- TOC ----
+function renderTocTab(){
+  const b=document.getElementById('sb-body');
+  if(!state.tocEntries.length){b.innerHTML='<div class="empty-sidebar">Sin tabla de contenidos.</div>';return}
+  function re(items,d){return items.map(it=>{const da=JSON.stringify(it.dest).replace(/"/g,'&quot;');return `<div class="toc-entry d${Math.min(d,2)}" style="padding-left:${14+d*12}px" data-dest="${da}"><span class="toc-title">${esc(it.title||'(sin título)')}</span></div>${it.items?.length?re(it.items,d+1):''}`}).join('')}
+  b.innerHTML=re(state.tocEntries,0);
+  b.querySelectorAll('.toc-entry').forEach(el=>el.onclick=async()=>{try{let dest=JSON.parse(el.dataset.dest.replace(/&quot;/g,'"'));if(typeof dest==='string')dest=await state.pdf.getDestination(dest);if(!Array.isArray(dest))return;goToPage((await state.pdf.getPageIndex(dest[0]))+1)}catch(_){}});
+}
+
+// ---- Flashcards ----
+function renderFcTab(){
+  const b=document.getElementById('sb-body');
+  if(!state.flashcards.length){b.innerHTML='<div class="empty-sidebar">Selecciona un término, pulsa <strong>"✨ Explicar"</strong> y luego <strong>"Guardar tarjeta"</strong> para crear flashcards.</div>';return}
+  const i=Math.min(state.flashcardIdx,state.flashcards.length-1);
+  const c=state.flashcards[i];
+  b.innerHTML=`<div class="fc-container">
+    <div class="fc-nav"><button class="fc-nav-btn" id="fc-p">‹</button><span class="fc-count">${i+1} / ${state.flashcards.length}</span><button class="fc-nav-btn" id="fc-n">›</button></div>
+    <div class="fc-card" id="fc-card"><div class="fc-inner">
+      <div class="fc-front"><p class="fc-term">${esc(c.front)}</p><p class="fc-tap-hint">Toca para ver</p></div>
+      <div class="fc-back"><div class="fc-back-text">${esc(c.back)}</div></div>
+    </div></div>
+    <button class="fc-delete-btn" id="fc-del">🗑 Eliminar</button></div>`;
+  document.getElementById('fc-p').onclick=()=>{state.flashcardIdx=(i-1+state.flashcards.length)%state.flashcards.length;renderFcTab()};
+  document.getElementById('fc-n').onclick=()=>{state.flashcardIdx=(i+1)%state.flashcards.length;renderFcTab()};
+  document.getElementById('fc-card').onclick=()=>document.getElementById('fc-card').classList.toggle('flipped');
+  document.getElementById('fc-del').onclick=async()=>{if(!confirm('¿Eliminar?'))return;setSaving(true);await state.sb.from('flashcards').delete().eq('id',c.id);setSaving(false);state.flashcards.splice(i,1);state.flashcardIdx=Math.max(0,i-1);renderSidebar()};
+}
+
+// ---- Chat ----
+function renderChatTab(){
+  const b=document.getElementById('sb-body');
+  if(!state.geminiKey){
+    b.innerHTML=`<div class="chat-key-setup"><strong>Activa el chat con IA</strong><br><br>Pega tu clave de Gemini. Se guarda en tu navegador.<br><br><a href="https://aistudio.google.com/apikey" target="_blank">Obtener clave gratis</a><input class="chat-key-input" id="gk" type="password" placeholder="AIza…"><button class="btn-primary" id="gk-btn">Activar</button></div>`;
+    document.getElementById('gk-btn').onclick=()=>{const k=document.getElementById('gk').value.trim();if(!k)return;state.geminiKey=k;localStorage.setItem(GEMINI_KEY_LS,k);renderChatTab()};
+    return;
+  }
+  const mc=state.chatMessages.length;
+  b.innerHTML=`<div class="chat-panel">
+    <div class="thread-bar">
+      <select id="th-sel">${state.chatThreads.map(t=>`<option value="${t.id}" ${t.id===state.currentThreadId?'selected':''}>${esc(t.title)}</option>`).join('')}</select>
+      <button class="thread-btn" id="th-new" title="Nuevo chat">＋</button>
+      <button class="thread-btn danger" id="th-del" title="Eliminar chat">🗑</button>
+    </div>
+    <div class="chat-header-bar"><span>${mc>0?mc+' msgs':'Vacío'}</span><div style="display:flex;gap:8px"><button class="chat-action-btn" id="ck-btn">Cambiar clave</button></div></div>
+    <div class="chat-messages" id="cm">${mc===0?'<div class="chat-empty">Pregunta sobre el documento o selecciona texto y pulsa "✨ Explicar".</div>':''}${state.chatMessages.map(m=>`<div class="chat-msg ${m.role}">${esc(m.text)}</div>`).join('')}${state.chatBusy?'<div class="chat-msg model pending">Pensando…</div>':''}</div>
+    <div class="chat-input-row"><textarea class="chat-textarea" id="ci" placeholder="Pregunta…" rows="1"></textarea><button class="chat-send-btn" id="cs" ${state.chatBusy?'disabled':''}>Enviar</button></div>
+  </div>`;
+  document.getElementById('cm').scrollTop=999999;
+  document.getElementById('th-sel').onchange=async e=>{state.currentThreadId=e.target.value;await loadThreadMsgs(state.currentThreadId);renderChatTab()};
+  document.getElementById('th-new').onclick=async()=>{const t=prompt('Nombre:',`Chat ${state.chatThreads.length+1}`);if(!t)return;const{data}=await state.sb.from('chat_threads').insert({document_id:state.currentDoc.id,title:t,user_id:state.session.user.id}).select().single();if(data){state.chatThreads.push(data);state.currentThreadId=data.id;state.chatMessages=[];renderChatTab()}};
+  document.getElementById('th-del').onclick=async()=>{if(state.chatThreads.length<=1){alert('Necesitas al menos un chat.');return}if(!confirm('¿Eliminar este chat?'))return;await state.sb.from('chat_threads').delete().eq('id',state.currentThreadId);state.chatThreads=state.chatThreads.filter(t=>t.id!==state.currentThreadId);state.currentThreadId=state.chatThreads[0].id;await loadThreadMsgs(state.currentThreadId);renderChatTab()};
+  document.getElementById('ck-btn').onclick=()=>{state.geminiKey='';localStorage.removeItem(GEMINI_KEY_LS);renderChatTab()};
+  const inp=document.getElementById('ci');
+  const send=()=>{const t=inp.value.trim();if(!t||state.chatBusy)return;inp.value='';sendChat(t)};
+  document.getElementById('cs').onclick=send;
+  inp.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}};
+}
+
+async function sendChat(text){
+  state.chatMessages.push({role:'user',text});state.chatBusy=true;renderChatTab();
+  const reply=await askGemini(text);
+  state.chatBusy=false;state.chatMessages.push({role:'model',text:reply});
+  renderChatTab();
+
+  const { error } = await state.sb.from('chat_messages').insert([
+    {document_id:state.currentDoc.id,thread_id:state.currentThreadId,role:'user',content:text,user_id:state.session.user.id},
+    {document_id:state.currentDoc.id,thread_id:state.currentThreadId,role:'model',content:reply,user_id:state.session.user.id},
+  ]);
+  if (error) {
+    console.error("Error saving chat:", error);
+    alert("Error al guardar mensajes de chat:\n" + error.message + "\n\nCódigo: " + error.code + "\nDetalles: " + error.details);
+  }
+}
+
+async function askGemini(userText){
+  const sys=`Eres un asistente de lectura dentro de Readily. El usuario lee "${state.currentDoc?.title||''}" (p.${state.pageNum}/${state.numPages}).
+
+Texto del documento:
+${state.docFullText}
+
+Reglas:
+- Responde en español de forma extremadamente clara, breve y concisa.
+- No uses respuestas abrumadoramente largas ni listas de viñetas interminables.
+- EVITA EL USO DE TEXTO EN NEGRITA (no utilices "**" para resaltar palabras bajo ningún concepto).
+- Cita la página cuando sea relevante.
+- Si algo no está definido en el documento, explícalo brevemente con tu conocimiento.`;
+  try{
+    const r=await fetch(`${GEMINI_API}?key=${state.geminiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({systemInstruction:{parts:[{text:sys}]},contents:state.chatMessages.slice(-MAX_CTX).map(m=>({role:m.role==='user'?'user':'model',parts:[{text:m.text}]}))})});
+    const d=await r.json();if(d.error)return`Error: ${d.error.message}`;
+    return d.candidates?.[0]?.content?.parts?.map(p=>p.text).join('')||'Sin respuesta.';
+  }catch(e){return`Error de conexión: ${e.message}`}
+}
+
+// ============================================================
+// Panel flotante de explicación — PERSISTE mientras lees
+// ============================================================
+function renderExplainPanel() {
+  let panel = document.getElementById('explain-panel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'explain-panel'; panel.className = 'explain-panel';
+    document.body.appendChild(panel);
+  }
+  const term = state.explainTerm;
+  const isLoading = state.explainLoading;
+  panel.innerHTML = `
+    <div class="explain-panel-header">
+      <div>
+        <div class="explain-panel-term">${esc(term.length > 60 ? term.slice(0, 60) + '…' : term)}</div>
+        <div class="explain-panel-page">Página ${state.explainPage} · ${esc(state.currentDoc?.title || '')}</div>
       </div>
-      <div id="sidebar-body"></div>
-    `;
-    document.getElementById('tab-highlights').addEventListener('click', () => { state.sidebarTab='highlights'; renderSidebar(); });
-    document.getElementById('tab-chat').addEventListener('click', () => { state.sidebarTab='chat'; renderSidebar(); });
-    if (state.sidebarTab === 'highlights') renderHighlightsTab(); else renderChatTab();
-  }
+      <button class="explain-panel-close" id="ep-close">✕</button>
+    </div>
+    <div class="explain-panel-body" id="ep-body">
+      ${isLoading ? '<div class="explain-loading"><div class="spinner"></div><span>Pensando…</span></div>'
+        : `<div class="explain-text">${esc(state.explainText)}</div>`}
+    </div>
+    ${!isLoading && state.explainText ? `
+    <div class="explain-panel-footer">
+      <button class="epf-btn" id="ep-chat">💬 Seguir en chat</button>
+      <button class="epf-btn primary" id="ep-fc">💾 Guardar tarjeta</button>
+    </div>` : ''}`;
 
-  function renderHighlightsTab(){
-    const body = document.getElementById('sidebar-body');
-    if (state.highlights.length === 0){
-      body.innerHTML = `<div class="empty-sidebar">Selecciona texto en el documento para crear el primero.</div>`;
-      return;
-    }
-    const sorted = [...state.highlights].sort((a,b)=> a.page-b.page);
-    body.innerHTML = sorted.map(h => `
-      <div class="hl-item" data-jump="${h.page}" data-id="${h.id}">
-        <div class="hl-bar" style="background:${h.color}"></div>
-        <div class="hl-body">
-          <div class="hl-page">Página ${h.page}</div>
-          <div class="hl-text">"${escapeHtml(h.text.length>140? h.text.slice(0,140)+'…':h.text)}"</div>
-          <textarea class="hl-note" data-note-id="${h.id}" placeholder="Agregar una nota...">${escapeHtml(h.note||'')}</textarea>
-          <div class="hl-actions"><button class="hl-delete" data-del-id="${h.id}">Eliminar</button></div>
-        </div>
-      </div>`).join('');
-    body.querySelectorAll('.hl-item').forEach(item => {
-      item.addEventListener('click', e => {
-        if (e.target.tagName === 'TEXTAREA' || e.target.classList.contains('hl-delete')) return;
-        goToPage(parseInt(item.dataset.jump));
-      });
-    });
-    body.querySelectorAll('.hl-note').forEach(ta => {
-      ta.addEventListener('click', e => e.stopPropagation());
-      ta.addEventListener('change', async e => {
-        const h = state.highlights.find(x => x.id === e.target.dataset.noteId);
-        if (!h) return;
-        h.note = e.target.value;
-        setSaving(true);
-        await state.sb.from('highlights').update({note: h.note}).eq('id', h.id);
-        setSaving(false);
-      });
-    });
-    body.querySelectorAll('.hl-delete').forEach(btn => {
-      btn.addEventListener('click', async e => {
-        e.stopPropagation();
-        const id = btn.dataset.delId;
-        state.highlights = state.highlights.filter(h => h.id !== id);
-        renderSidebar(); drawHighlightLayer(state.pageNum); drawMarginStrip(state.pageNum);
-        setSaving(true);
-        await state.sb.from('highlights').delete().eq('id', id);
-        setSaving(false);
-      });
-    });
-  }
+  document.getElementById('ep-close').onclick = () => { state.explainVisible = false; panel.remove(); };
 
-  // ---------------- AI CHAT TAB ----------------
-  function renderChatTab(){
-    const body = document.getElementById('sidebar-body');
-    if (!state.geminiKey){
-      body.innerHTML = `
-        <div class="chat-key-setup">
-          Pega tu clave de la API de Gemini para activar el chat sobre esta lectura.
-          Se usa solo en tu navegador, en esta sesión.<br>
-          Consíguela gratis en <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a>.
-          <input id="gemini-key-input" placeholder="AIza...">
-          <button class="btn-primary" id="gemini-key-btn">Activar chat</button>
-        </div>`;
-      document.getElementById('gemini-key-btn').addEventListener('click', () => {
-        const key = document.getElementById('gemini-key-input').value.trim();
-        if (!key) return;
-        state.geminiKey = key;
-        renderChatTab();
-      });
-      return;
-    }
-
-    body.innerHTML = `
-      <div class="chat-panel">
-        <div class="chat-messages" id="chat-messages">
-          ${state.chatMessages.length === 0 ? `<div class="chat-empty">Pregunta lo que quieras sobre este documento, o selecciona un fragmento en la página y pulsa "Explicar".</div>` : ''}
-          ${state.chatMessages.map(m => `<div class="chat-msg ${m.role}">${escapeHtml(m.text)}</div>`).join('')}
-          ${state.chatBusy ? `<div class="chat-msg model pending">Pensando...</div>` : ''}
-        </div>
-        <div class="chat-input-row">
-          <textarea id="chat-input" placeholder="Pregunta algo sobre la lectura..."></textarea>
-          <button id="chat-send">Enviar</button>
-        </div>
-      </div>`;
-    const msgBox = document.getElementById('chat-messages');
-    msgBox.scrollTop = msgBox.scrollHeight;
-
-    const input = document.getElementById('chat-input');
-    const send = () => {
-      const text = input.value.trim();
-      if (!text || state.chatBusy) return;
-      input.value = '';
-      sendChatMessage(text);
+  if (!isLoading && state.explainText) {
+    document.getElementById('ep-chat').onclick = () => {
+      state.sidebarOpen = true; state.sidebarTab = 'chat';
+      document.getElementById('sidebar')?.classList.remove('hidden');
+      renderToolbar(); renderSidebar();
+      sendChat(`Quiero profundizar sobre "${term}" en el contexto de este libro.`);
     };
-    document.getElementById('chat-send').addEventListener('click', send);
-    input.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); send(); }
+    document.getElementById('ep-fc').onclick = async () => {
+      const btn = document.getElementById('ep-fc');
+      btn.disabled = true; btn.textContent = 'Guardando…';
+      try {
+        const { data, error } = await state.sb.from('flashcards').insert({
+          document_id: state.currentDoc.id, front: term, back: state.explainText, user_id: state.session.user.id
+        }).select().single();
+        if (error) throw error;
+        state.flashcards.push(data);
+        btn.textContent = '✅ Guardada';
+        renderSidebar();
+      } catch (err) {
+        btn.textContent = '⚠️ Error';
+        btn.disabled = false;
+        alert('No se pudo guardar la flashcard.\n\n¿Ya ejecutaste el SQL de migración en Supabase?\n\nError: ' + (err.message || err));
+      }
+    };
+  }
+}
+
+async function triggerExplain(term, pageNum) {
+  state.explainTerm = term;
+  state.explainPage = pageNum;
+  state.explainText = '';
+  state.explainLoading = true;
+  state.explainVisible = true;
+  renderExplainPanel();
+
+  // Contexto de la página
+  const pd = state.searchIndex.find(p => p.page === pageNum);
+  const pt = pd?.text || '';
+  const tl = term.toLowerCase(), pl = pt.toLowerCase();
+  const ti = pl.indexOf(tl);
+  let ctx = pt;
+  if (ti !== -1) { const s = Math.max(0, ti - 300), e = Math.min(pt.length, ti + term.length + 400); ctx = pt.slice(s, e); }
+  else ctx = pt.slice(0, 800);
+
+  const prompt = `Explica de forma didáctica, clara y muy breve qué significa "${term}" en el contexto de la lectura "${state.currentDoc?.title || ''}".
+
+Contexto de la página ${pageNum}:
+"${ctx}"
+
+Instrucciones:
+1. Sé conciso y fácil de leer. No generes textos abrumadoramente largos.
+2. NO uses negrita (no utilices "**" para resaltar palabras).
+3. Empieza con una definición muy simple en una o dos líneas, fácil de entender.
+4. Da una analogía simple de la vida cotidiana.
+5. Explica brevemente por qué el autor usa este término en el libro.
+6. Da un ejemplo práctico corto.
+
+Responde de manera fluida y directa. No numeres las secciones ni uses formato JSON. Escribe con un tono cercano y didáctico.`;
+
+  try {
+    const r = await fetch(`${GEMINI_API}?key=${state.geminiKey}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }] })
     });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error.message);
+    state.explainText = d.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || 'Sin respuesta.';
+  } catch (err) {
+    state.explainText = '⚠️ Error: ' + err.message;
   }
+  state.explainLoading = false;
+  if (state.explainVisible) renderExplainPanel();
+}
 
-  async function sendChatMessage(userText){
-    state.chatMessages.push({ role:'user', text:userText });
-    state.chatBusy = true;
-    renderChatTab();
-    const reply = await askGemini(userText);
-    state.chatBusy = false;
-    state.chatMessages.push({ role:'model', text: reply });
-    renderChatTab();
+function explainSelection() {
+  if (!pendingSelection) return;
+  const { text, pageNum } = pendingSelection;
+  hideSelectionToolbar();
+  window.getSelection().removeAllRanges();
+  if (!state.geminiKey) {
+    state.sidebarOpen = true; state.sidebarTab = 'chat';
+    document.getElementById('sidebar')?.classList.remove('hidden');
+    renderToolbar(); renderSidebar(); return;
   }
+  triggerExplain(text, pageNum);
+}
 
-  async function askGemini(userText){
-    const systemInstruction = `Eres un asistente de lectura dentro de una app tipo lector de PDF. El usuario está leyendo el documento "${state.currentDoc?.title || ''}", actualmente en la página ${state.pageNum} de ${state.numPages}. Aquí tienes el texto extraído del documento completo (puede venir con saltos de página marcados como [Página N]):\n\n${state.docFullText}\n\nInstrucciones: responde en español, de forma clara y sencilla. Cuando cites algo, menciona la página si la sabes.\n\nMUY IMPORTANTE: cuando te pidan explicar un término, frase o concepto, tu prioridad es que el usuario lo entienda, no reportar si el documento lo define o no. Si el documento SÍ lo define, usa esa definición. Si el documento NO lo define (solo lo menciona de pasada), explícalo de todas formas usando tu propio conocimiento general del tema, con lenguaje simple y un ejemplo concreto, como si se lo explicaras a alguien sin conocimiento previo. Solo aclara brevemente al final que el documento no profundiza en él, pero nunca te quedes solo en "el documento no lo explica" sin dar la explicación real.`;
-    try{
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`, {
-        method: 'POST',
-        headers: {
-          'Content-Type':'application/json',
-          'x-goog-api-key': state.geminiKey,
-        },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemInstruction }] },
-          contents: state.chatMessages.map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts:[{text:m.text}] }))
-        })
-      });
-      const data = await res.json();
-      if (data.error) return `Error de la API: ${data.error.message}`;
-      return data.candidates?.[0]?.content?.parts?.map(p=>p.text).join('') || 'No obtuve respuesta, intenta de nuevo.';
-    }catch(err){
-      return `No se pudo conectar con Gemini: ${err.message}`;
-    }
-  }
+// ============================================================
+// Page navigation & rendering
+// ============================================================
+function setSaving(v) { state.saving = v; const d = document.querySelector('.sync-dot'); if (d) { d.classList.toggle('saving', v); d.title = v ? 'Guardando…' : 'Guardado'; } }
 
-  function explainSelection(){
-    if (!pendingSelection) return;
-    const { text, pageNum } = pendingSelection;
-    hideSelectionToolbar();
-    window.getSelection().removeAllRanges();
-    state.sidebarOpen = true;
-    state.sidebarTab = 'chat';
-    document.getElementById('sidebar').classList.remove('hidden');
-    renderToolbar();
-    renderSidebar();
-    sendChatMessage(`Explícame qué significa esto, en términos simples y con un ejemplo (está en la página ${pageNum} del documento): "${text}"`);
-  }
+async function goToPage(n) {
+  n = Math.max(1, Math.min(state.numPages, n)); state.pageNum = n; renderToolbar(); renderPage(n);
+  setSaving(true);
+  await state.sb.from('reading_progress').upsert({ document_id: state.currentDoc.id, page: n, updated_at: new Date().toISOString() }, { onConflict: 'document_id,user_id' });
+  setSaving(false);
+}
 
-  function setSaving(v){
-    state.saving = v;
-    const dot = document.querySelector('.sync-dot');
-    if (dot){ dot.classList.toggle('saving', v); dot.title = v ? 'Guardando...' : 'Guardado en la nube'; }
-  }
+async function renderPage(num) {
+  const page = await state.pdf.getPage(num);
+  const vp = page.getViewport({ scale: state.scale });
+  const pw = document.getElementById('page-wrap'); pw.innerHTML = '';
+  pw.style.width = vp.width + 'px'; pw.style.height = vp.height + 'px';
 
-  async function goToPage(n){
-    n = Math.max(1, Math.min(state.numPages, n));
-    state.pageNum = n;
-    renderToolbar();
-    renderPage(n);
-    setSaving(true);
-    await state.sb.from('reading_progress').upsert({
-      document_id: state.currentDoc.id, page: n, updated_at: new Date().toISOString()
-    }, { onConflict: 'document_id,user_id' });
-    setSaving(false);
-  }
+  const cv = document.createElement('canvas');
+  cv.width = vp.width; cv.height = vp.height; pw.appendChild(cv);
+  await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
 
-  async function renderPage(num){
-    const page = await state.pdf.getPage(num);
-    const viewport = page.getViewport({scale: state.scale});
-    const pageWrap = document.getElementById('page-wrap');
-    pageWrap.innerHTML = '';
-    pageWrap.style.width = viewport.width+'px'; pageWrap.style.height = viewport.height+'px';
+  const hl = document.createElement('div'); hl.className = 'highlight-layer'; hl.id = 'hl-layer'; pw.appendChild(hl);
 
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width; canvas.height = viewport.height;
-    pageWrap.appendChild(canvas);
-    await page.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+  const td = document.createElement('div');
+  td.className = 'textLayer'; td.id = 'text-layer';
+  td.style.width = vp.width + 'px'; td.style.height = vp.height + 'px';
+  td.style.setProperty('--scale-factor', vp.scale);
+  pw.appendChild(td);
 
-    const highlightLayer = document.createElement('div');
-    highlightLayer.className = 'highlight-layer'; highlightLayer.id = 'highlight-layer';
-    pageWrap.appendChild(highlightLayer);
+  const tc = await page.getTextContent();
+  await pdfjsLib.renderTextLayer({ textContentSource: tc, container: td, viewport: vp }).promise;
 
-    const textLayerDiv = document.createElement('div');
-    textLayerDiv.className = 'textLayer'; textLayerDiv.id = 'text-layer';
-    textLayerDiv.style.width = viewport.width+'px'; textLayerDiv.style.height = viewport.height+'px';
-    pageWrap.appendChild(textLayerDiv);
+  drawHL(num); drawMS(num);
+  td.addEventListener('mouseup', () => onSelectionEnd(num));
+  td.addEventListener('touchend', () => setTimeout(() => onSelectionEnd(num), 100));
+}
 
-    const textContent = await page.getTextContent();
-    await pdfjsLib.renderTextLayer({ textContentSource: textContent, container: textLayerDiv, viewport }).promise;
+function drawHL(pn) {
+  const l = document.getElementById('hl-layer'); if (!l) return; l.innerHTML = '';
+  state.highlights.filter(h => h.page === pn).forEach(h => h.rects.forEach(r => {
+    const d = document.createElement('div'); d.className = 'hl-rect'; d.dataset.hid = h.id;
+    d.style.left = (r.x*100)+'%'; d.style.top = (r.y*100)+'%'; d.style.width = (r.w*100)+'%'; d.style.height = (r.h*100)+'%';
+    d.style.background = h.color; d.title = h.note || h.text.slice(0, 60);
+    d.onclick = () => flashHL(h.id); l.appendChild(d);
+  }));
+}
 
-    drawHighlightLayer(num);
-    drawMarginStrip(num);
-    textLayerDiv.addEventListener('mouseup', () => onSelectionEnd(num));
-  }
-
-  function drawHighlightLayer(pageNum){
-    const layer = document.getElementById('highlight-layer');
-    if (!layer) return;
-    layer.innerHTML = '';
-    state.highlights.filter(h => h.page === pageNum).forEach(h => {
-      h.rects.forEach(r => {
-        const div = document.createElement('div');
-        div.className = 'hl-rect'; div.dataset.hid = h.id;
-        div.style.left=(r.x*100)+'%'; div.style.top=(r.y*100)+'%';
-        div.style.width=(r.w*100)+'%'; div.style.height=(r.h*100)+'%';
-        div.style.background = h.color;
-        div.title = h.note || h.text.slice(0,60);
-        div.addEventListener('click', () => flashSidebarItem(h.id));
-        layer.appendChild(div);
-      });
-    });
-  }
-
-  function drawMarginStrip(pageNum){
-    const strip = document.getElementById('margin-strip');
-    const pageWrap = document.getElementById('page-wrap');
-    if (!strip || !pageWrap) return;
-    strip.innerHTML = ''; strip.style.height = pageWrap.style.height;
-    state.highlights.filter(h => h.page === pageNum).forEach(h => {
-      const top = h.rects[0].y * parseFloat(pageWrap.style.height);
-      const tick = document.createElement('div');
-      tick.className = 'tick'; tick.style.top = top+'px'; tick.style.background = h.color;
-      tick.title = h.text.slice(0,60);
-      tick.addEventListener('click', () => flashSidebarItem(h.id));
-      strip.appendChild(tick);
-    });
-  }
-
-  function flashSidebarItem(id){
-    if (!state.sidebarOpen){
-      state.sidebarOpen = true;
-      document.getElementById('sidebar').classList.remove('hidden');
-      renderToolbar();
-    }
-    const el = document.querySelector(`.hl-item[data-id="${id}"]`);
-    if (!el) return;
-    el.scrollIntoView({behavior:'smooth', block:'center'});
-    el.classList.add('flash');
-    setTimeout(()=>el.classList.remove('flash'), 900);
-  }
-
-  // ---------------- selection -> floating color picker -> commit ----------------
-  let pendingSelection = null;
-
-  function onSelectionEnd(pageNum){
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || sel.rangeCount===0){ hideSelectionToolbar(); return; }
-    const text = sel.toString().trim();
-    if (!text){ hideSelectionToolbar(); return; }
-    const range = sel.getRangeAt(0);
-    const textLayerDiv = document.getElementById('text-layer');
-    if (!textLayerDiv.contains(range.commonAncestorContainer)){ hideSelectionToolbar(); return; }
-    const pageBox = textLayerDiv.getBoundingClientRect();
-    const clientRects = Array.from(range.getClientRects()).filter(r=>r.width>0&&r.height>0);
-    if (clientRects.length===0){ hideSelectionToolbar(); return; }
-    const rects = clientRects.map(r => ({
-      x:(r.left-pageBox.left)/pageBox.width, y:(r.top-pageBox.top)/pageBox.height,
-      w:r.width/pageBox.width, h:r.height/pageBox.height,
-    }));
-    pendingSelection = { pageNum, rects, text };
-    showSelectionToolbar(clientRects[0], pageBox);
-  }
-
-  function showSelectionToolbar(firstRect, pageBox){
-    let bar = document.getElementById('selection-toolbar');
-    if (!bar){
-      bar = document.createElement('div'); bar.id='selection-toolbar'; bar.className='selection-toolbar';
-      document.getElementById('page-wrap').appendChild(bar);
-    }
-    bar.innerHTML =
-      COLORS.map(c => `<div class="swatch-dot" data-color="${c.hex}" style="background:${c.hex}" title="Subrayar en ${c.name}"></div>`).join('') +
-      `<div class="divider"></div><button class="explain-btn" id="explain-btn">✨ Explicar</button>`;
-    bar.style.left = (firstRect.left-pageBox.left+firstRect.width/2)+'px';
-    bar.style.top = (firstRect.top-pageBox.top-10)+'px';
-    bar.style.display = 'flex';
-    bar.querySelectorAll('.swatch-dot').forEach(dot => {
-      dot.addEventListener('mousedown', e => e.stopPropagation());
-      dot.addEventListener('click', () => commitHighlight(dot.dataset.color));
-    });
-    document.getElementById('explain-btn').addEventListener('mousedown', e => e.stopPropagation());
-    document.getElementById('explain-btn').addEventListener('click', explainSelection);
-  }
-  function hideSelectionToolbar(){
-    const bar = document.getElementById('selection-toolbar');
-    if (bar) bar.style.display = 'none';
-    pendingSelection = null;
-  }
-
-  async function commitHighlight(color){
-    if (!pendingSelection) return;
-    const { pageNum, rects, text } = pendingSelection;
-    const localId = uid();
-    state.highlights.push({ id: localId, page: pageNum, rects, color, text, note: '' });
-    window.getSelection().removeAllRanges();
-    hideSelectionToolbar();
-    drawHighlightLayer(pageNum); drawMarginStrip(pageNum); renderSidebar();
-
-    setSaving(true);
-    const { data, error } = await state.sb.from('highlights').insert({
-      document_id: state.currentDoc.id, page: pageNum, rects, color, text
-    }).select().single();
-    setSaving(false);
-    if (!error && data){
-      const h = state.highlights.find(x => x.id === localId);
-      if (h) h.id = data.id; // swap temp id for the real DB id
-      renderSidebar();
-    }
-  }
-
-  document.addEventListener('mousedown', e => {
-    const bar = document.getElementById('selection-toolbar');
-    if (bar && bar.style.display!=='none' && !bar.contains(e.target)) hideSelectionToolbar();
+function drawMS(pn) {
+  const s = document.getElementById('margin-strip'), pw = document.getElementById('page-wrap');
+  if (!s || !pw) return; s.innerHTML = ''; s.style.height = pw.style.height;
+  state.highlights.filter(h => h.page === pn).forEach(h => {
+    const top = h.rects[0].y * parseFloat(pw.style.height);
+    const t = document.createElement('div'); t.className = 'tick'; t.style.top = top + 'px'; t.style.background = h.color;
+    t.title = h.text.slice(0, 60); t.onclick = () => flashHL(h.id); s.appendChild(t);
   });
+}
 
+function flashHL(id) {
+  if (!state.sidebarOpen) { state.sidebarOpen = true; document.getElementById('sidebar')?.classList.remove('hidden'); renderToolbar(); }
+  if (state.sidebarTab !== 'highlights') { state.sidebarTab = 'highlights'; renderSidebar(); }
+  const el = document.querySelector(`.hl-item[data-id="${id}"]`);
+  if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 900); }
+}
+
+// ============================================================
+// Selection → highlight / explain
+// ============================================================
+let pendingSelection = null;
+
+function onSelectionEnd(pageNum) {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.rangeCount) { hideSelectionToolbar(); return; }
+  let text = sel.toString().trim();
+  if (!text) { hideSelectionToolbar(); return; }
+  // Limpiar texto seleccionado
+  text = cleanSelectedText(text, pageNum);
+  if (!text || text.length < 2) { hideSelectionToolbar(); return; }
+
+  const range = sel.getRangeAt(0);
+  const td = document.getElementById('text-layer');
+  if (!td?.contains(range.commonAncestorContainer)) { hideSelectionToolbar(); return; }
+  const pb = td.getBoundingClientRect();
+  const cr = Array.from(range.getClientRects()).filter(r => r.width > 0 && r.height > 0);
+  if (!cr.length) { hideSelectionToolbar(); return; }
+  const rects = cr.map(r => ({ x:(r.left-pb.left)/pb.width, y:(r.top-pb.top)/pb.height, w:r.width/pb.width, h:r.height/pb.height }));
+  pendingSelection = { pageNum, rects, text };
+  showSelectionToolbar(cr[0], pb);
+}
+
+function showSelectionToolbar(fr, pb) {
+  let bar = document.getElementById('sel-tb');
+  if (!bar) { bar = document.createElement('div'); bar.id = 'sel-tb'; bar.className = 'selection-toolbar'; document.getElementById('page-wrap').appendChild(bar); }
+  bar.innerHTML = COLORS.map(c => `<div class="swatch-dot" data-c="${c.hex}" style="background:${c.hex}" title="${c.name}"></div>`).join('') +
+    `<div class="sel-divider"></div><button class="explain-btn" id="ex-btn">✨ Explicar</button>`;
+  bar.style.left = (fr.left - pb.left + fr.width / 2) + 'px';
+  bar.style.top = (fr.top - pb.top - 10) + 'px';
+  bar.style.display = 'flex';
+  bar.querySelectorAll('.swatch-dot').forEach(dot => { dot.onmousedown = e => e.stopPropagation(); dot.onclick = () => commitHL(dot.dataset.c); });
+  document.getElementById('ex-btn').onmousedown = e => e.stopPropagation();
+  document.getElementById('ex-btn').onclick = explainSelection;
+}
+
+function hideSelectionToolbar() { const b = document.getElementById('sel-tb'); if (b) b.style.display = 'none'; pendingSelection = null; }
+
+async function commitHL(color) {
+  if (!pendingSelection) return;
+  const { pageNum, rects, text } = pendingSelection;
+  const lid = uid();
+  state.highlights.push({ id: lid, page: pageNum, rects, color, text, note: '' });
+  window.getSelection().removeAllRanges(); hideSelectionToolbar();
+  drawHL(pageNum); drawMS(pageNum); renderSidebar();
+  setSaving(true);
+  const { data, error } = await state.sb.from('highlights').insert({ document_id: state.currentDoc.id, page: pageNum, rects, color, text, user_id: state.session.user.id }).select().single();
+  setSaving(false);
+  if (!error && data) { const h = state.highlights.find(x => x.id === lid); if (h) h.id = data.id; renderSidebar(); }
+}
+
+document.addEventListener('mousedown', e => {
+  const b = document.getElementById('sel-tb');
+  if (b && b.style.display !== 'none' && !b.contains(e.target)) hideSelectionToolbar();
+});
+
+// ============================================================
+// Boot
+// ============================================================
+async function boot() {
+  const sbU = localStorage.getItem(SB_URL_LS), sbK = localStorage.getItem(SB_KEY_LS);
+  if (sbU && sbK) {
+    renderLoading('Conectando…');
+    try {
+      state.sb = window.supabase.createClient(sbU, sbK);
+      const { data: { session } } = await state.sb.auth.getSession();
+      if (session) { state.session = session; state.view = 'library'; await loadDocuments(); }
+      else state.view = 'auth';
+    } catch (_) { state.view = 'connect'; }
+  }
   render();
-})();
+}
+boot();
 </script>
+</body>
+</html>
