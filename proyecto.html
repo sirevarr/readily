@@ -244,7 +244,110 @@
     .ask-popup-input::placeholder{color:var(--ink-soft)}
     .ask-popup-send{background:var(--accent);color:#fff;border:none;border-radius:10px;width:38px;height:38px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .12s}
     .ask-popup-send:hover{background:var(--accent-h)}
-    @media(max-width:520px){.ask-popup{left:10px;right:10px;width:auto}}
+    /* ============================================================
+       MOBILE / TOUCH OPTIMIZATIONS
+       ============================================================ */
+
+    /* Prevent iOS auto-zoom on inputs */
+    @media(max-width:640px){
+      input,textarea,select{font-size:16px !important}
+
+      /* Toolbar: compact & scrollable */
+      .spine{padding:8px 10px;gap:6px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+      .spine::-webkit-scrollbar{display:none}
+      .spine-sep{display:none !important}
+      .page-total{display:none}
+      .spine-btn{padding:8px 12px;min-height:38px}
+
+      /* PDF stage: less padding, hide margin strip */
+      .stage{padding:16px 6px 120px}
+      .margin-strip{display:none}
+
+      /* Library */
+      .library-wrap{padding:24px 16px 40px}
+      .library-header{flex-direction:column;gap:14px}
+
+      /* Sidebar: bottom sheet */
+      .sidebar{
+        position:fixed !important;
+        left:0 !important;right:0 !important;bottom:0 !important;
+        width:100% !important;
+        max-height:78vh;
+        border-left:none !important;
+        border-top:1px solid var(--line);
+        border-radius:20px 20px 0 0;
+        box-shadow:0 -10px 44px rgba(0,0,0,.22);
+        z-index:50;
+        display:flex !important;
+        transform:translateY(0);
+        transition:transform .32s cubic-bezier(.32,.72,0,1);
+      }
+      .sidebar.hidden{
+        transform:translateY(110%);
+        pointer-events:none;
+        visibility:hidden;
+      }
+
+      /* Selection toolbar: bigger touch targets */
+      .selection-toolbar{padding:10px 16px;gap:10px}
+      .selection-toolbar .swatch-dot{width:28px;height:28px}
+      .explain-btn{padding:8px 16px;font-size:13px;min-height:36px}
+
+      /* Explain & Ask panels: bottom sheet */
+      .explain-panel{
+        left:0 !important;right:0 !important;bottom:0 !important;
+        width:100% !important;
+        border-radius:20px 20px 0 0 !important;
+        max-height:62vh;
+      }
+      .ask-popup{
+        left:0 !important;right:0 !important;bottom:0 !important;
+        width:100% !important;
+        border-radius:20px 20px 0 0 !important;
+      }
+
+      /* Chat actions always visible on touch */
+      .chat-msg-actions{display:flex !important}
+    }
+
+    /* Backdrop for bottom sheet sidebar */
+    .sidebar-backdrop{
+      display:none;
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.45);
+      z-index:49;
+      -webkit-backdrop-filter:blur(3px);
+      backdrop-filter:blur(3px);
+      animation:fadeIn .22s ease;
+    }
+    .sidebar-backdrop.visible{display:block}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+    /* Drag handle for bottom sheet */
+    .sidebar-handle{
+      display:none;
+      flex-shrink:0;
+      width:36px;height:4px;
+      background:var(--line);
+      border-radius:2px;
+      margin:10px auto 0;
+    }
+    @media(max-width:640px){.sidebar-handle{display:block}}
+
+    /* Mobile close button inside sidebar tabs */
+    .sidebar-close-btn{
+      display:none;
+      margin-left:auto;
+      background:none;
+      border:none;
+      color:var(--ink-soft);
+      font-size:18px;
+      padding:8px 10px;
+      cursor:pointer;
+      flex-shrink:0;
+    }
+    @media(max-width:640px){.sidebar-close-btn{display:block}}
   </style>
 </head>
 <body>
@@ -540,6 +643,11 @@ function renderReaderShell() {
       </div>
       <div class="sidebar ${state.sidebarOpen?'':'hidden'}" id="sidebar"></div>
     </div>`;
+  // Backdrop for mobile bottom sheet
+  const bd = document.createElement('div');
+  bd.id = 'sidebar-backdrop'; bd.className = 'sidebar-backdrop';
+  bd.onclick = () => toggleSidebar(false);
+  document.body.appendChild(bd);
   renderToolbar(); renderSidebar(); renderPage(state.pageNum);
   if (state.explainVisible) renderExplainPanel();
 }
@@ -562,7 +670,7 @@ function renderToolbar() {
     <button class="spine-btn ${state.searchBarOpen?'active':''}" id="st">🔍</button>
     <div class="spacer"></div>
     <span class="sync-dot ${state.saving?'saving':''}" title="${state.saving?'Guardando…':'Guardado'}"></span>
-    <button class="spine-btn" id="ts">${state.sidebarOpen?'Ocultar notas':'Ver notas'}</button>`;
+    <button class="spine-btn" id="ts">${state.sidebarOpen?'✕ Notas':'☰ Notas'}</button>`;
   document.getElementById('back-lib').onclick = () => { state.view='library'; renderLibrary(); };
   document.getElementById('pp').onclick = () => goToPage(state.pageNum-1);
   document.getElementById('np').onclick = () => goToPage(state.pageNum+1);
@@ -570,7 +678,17 @@ function renderToolbar() {
   document.getElementById('zi').onclick = () => { state.scale=Math.min(state.scale+.2,3); renderPage(state.pageNum); };
   document.getElementById('zo').onclick = () => { state.scale=Math.max(state.scale-.2,.5); renderPage(state.pageNum); };
   document.getElementById('st').onclick = toggleSearchBar;
-  document.getElementById('ts').onclick = () => { state.sidebarOpen=!state.sidebarOpen; document.getElementById('sidebar')?.classList.toggle('hidden',!state.sidebarOpen); renderToolbar(); };
+  document.getElementById('ts').onclick = () => toggleSidebar();
+}
+
+function toggleSidebar(forceOpen) {
+  const open = forceOpen !== undefined ? forceOpen : !state.sidebarOpen;
+  state.sidebarOpen = open;
+  const sb = document.getElementById('sidebar');
+  const bd = document.getElementById('sidebar-backdrop');
+  if (sb) sb.classList.toggle('hidden', !open);
+  if (bd) bd.classList.toggle('visible', open && window.innerWidth <= 640);
+  renderToolbar();
 }
 
 // ============================================================
@@ -620,17 +738,20 @@ function renderSidebar() {
   const hasToc = state.tocEntries.length > 0;
   const fc = state.flashcards.length;
   sb.innerHTML = `
+    <div class="sidebar-handle"></div>
     <div class="sidebar-tabs">
       <button id="t-hl" class="${state.sidebarTab==='highlights'?'active':''}">Subrayados</button>
       ${hasToc?`<button id="t-toc" class="${state.sidebarTab==='toc'?'active':''}">Índice</button>`:''}
       <button id="t-chat" class="${state.sidebarTab==='chat'?'active':''}">Chat IA</button>
       <button id="t-fc" class="${state.sidebarTab==='flashcards'?'active':''}">Tarjetas${fc>0?` <span class="fc-badge">${fc}</span>`:''}</button>
+      <button class="sidebar-close-btn" id="sb-close">✕</button>
     </div>
     <div class="sidebar-body" id="sb-body"></div>`;
   document.getElementById('t-hl').onclick=()=>{state.sidebarTab='highlights';renderSidebar()};
   if(hasToc)document.getElementById('t-toc').onclick=()=>{state.sidebarTab='toc';renderSidebar()};
   document.getElementById('t-chat').onclick=()=>{state.sidebarTab='chat';renderSidebar()};
   document.getElementById('t-fc').onclick=()=>{state.sidebarTab='flashcards';renderSidebar()};
+  document.getElementById('sb-close').onclick=()=>toggleSidebar(false);
   if(state.sidebarTab==='highlights')renderHlTab();
   else if(state.sidebarTab==='toc')renderTocTab();
   else if(state.sidebarTab==='chat')renderChatTab();
@@ -907,9 +1028,9 @@ function renderExplainPanel() {
 
   if (!isLoading && state.explainText) {
     document.getElementById('ep-chat').onclick = () => {
-      state.sidebarOpen = true; state.sidebarTab = 'chat';
-      document.getElementById('sidebar')?.classList.remove('hidden');
-      renderToolbar(); renderSidebar();
+      state.sidebarTab = 'chat';
+      toggleSidebar(true);
+      renderSidebar();
       sendChat(`Quiero profundizar sobre "${term}" en el contexto de este libro.`);
     };
     document.getElementById('ep-fc').onclick = async () => {
@@ -983,9 +1104,9 @@ function explainSelection() {
   hideSelectionToolbar();
   window.getSelection().removeAllRanges();
   if (!state.geminiKey) {
-    state.sidebarOpen = true; state.sidebarTab = 'chat';
-    document.getElementById('sidebar')?.classList.remove('hidden');
-    renderToolbar(); renderSidebar(); return;
+    state.sidebarTab = 'chat';
+    toggleSidebar(true);
+    renderSidebar(); return;
   }
   triggerExplain(text, pageNum);
 }
@@ -1023,12 +1144,10 @@ function askAboutSelection() {
     const q = inp.value.trim();
     if (!q) return;
     popup.remove();
-    // Abrir sidebar en chat
-    state.sidebarOpen = true; state.sidebarTab = 'chat';
+    state.sidebarTab = 'chat';
     state.chatCitation = text;
-    const sidebar = document.getElementById('sidebar');
-    if (sidebar) sidebar.classList.remove('hidden');
-    renderToolbar(); renderSidebar();
+    toggleSidebar(true);
+    renderSidebar();
     sendChat(q);
   };
 
@@ -1097,7 +1216,7 @@ function drawMS(pn) {
 }
 
 function flashHL(id) {
-  if (!state.sidebarOpen) { state.sidebarOpen = true; document.getElementById('sidebar')?.classList.remove('hidden'); renderToolbar(); }
+  if (!state.sidebarOpen) toggleSidebar(true);
   if (state.sidebarTab !== 'highlights') { state.sidebarTab = 'highlights'; renderSidebar(); }
   const el = document.querySelector(`.hl-item[data-id="${id}"]`);
   if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 900); }
