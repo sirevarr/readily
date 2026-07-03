@@ -787,11 +787,20 @@ function startEditMessage(idx) {
   const wrap = document.querySelector(`.chat-msg-wrap[data-idx="${idx}"]`);
   if (!wrap) return;
 
-  const rawText = msg.text.startsWith('> "')
-    ? msg.text.split('"\n\n').slice(1).join('"\n\n')
-    : msg.text;
+  // Detectar si el mensaje original tenía una cita
+  let citation = '';
+  let rawText = msg.text;
+  if (msg.text.startsWith('> "')) {
+    // Formato: > "CITA"\n\nPREGUNTA
+    const sepIdx = msg.text.indexOf('"\n\n');
+    if (sepIdx !== -1) {
+      citation = msg.text.slice(3, sepIdx);  // sin el > " del inicio
+      rawText = msg.text.slice(sepIdx + 3);
+    }
+  }
 
   wrap.innerHTML = `
+    ${citation ? `<div class="chat-cite-block">"${esc(citation)}"</div>` : ''}
     <textarea class="chat-edit-area" id="edit-ta">${esc(rawText)}</textarea>
     <div class="chat-edit-actions">
       <button class="chat-edit-save" id="edit-save">Guardar y reenviar</button>
@@ -817,10 +826,14 @@ function startEditMessage(idx) {
     // Truncar el historial local hasta antes de idx
     state.chatMessages = state.chatMessages.slice(0, idx);
 
+    // Restaurar la cita si existía para que sendChat la incluya de nuevo
+    if (citation) state.chatCitation = citation;
+
     // Enviar el mensaje editado como si fuera nuevo
     sendChat(newText);
   };
 }
+
 
 async function askGemini(userText){
   const sys=`Eres un asistente de lectura dentro de Readily. El usuario lee "${state.currentDoc?.title||''}" (p.${state.pageNum}/${state.numPages}).
