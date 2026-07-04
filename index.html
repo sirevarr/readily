@@ -12,6 +12,9 @@
   <meta name="apple-mobile-web-app-title" content="Readily">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/web/pdf_viewer.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --paper:#F3EFE6;--ink:#262421;--ink-soft:#5B564E;
@@ -19,8 +22,9 @@
       --accent:#3F6E63;--accent-h:#34594f;--accent-soft:#DCE7E3;
       --line:#DDD5C4;--sidebar-bg:#FBF9F4;
       --serif:Georgia,"Iowan Old Style","Palatino Linotype",serif;
-      --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+      --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
       --r:10px;--shadow:0 8px 28px rgba(38,36,33,.1);
+      --warn:#E9B949;--danger:#B4433A;
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%}
@@ -48,30 +52,56 @@
     .error-msg{color:#B4433A;font-size:13px;margin-top:10px;line-height:1.4}
     .ok-msg{color:var(--accent);font-size:13px;margin-top:10px;line-height:1.4}
 
-    .library-wrap{flex:1;padding:44px 20px 60px;max-width:760px;margin:0 auto;width:100%}
-    .library-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px}
+    /* ============================================================
+       LIBRARY — grid mejorado
+       ============================================================ */
+    .library-wrap{flex:1;padding:44px 24px 80px;max-width:900px;margin:0 auto;width:100%}
+    .library-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;gap:16px;flex-wrap:wrap}
     .library-title{font-family:var(--serif);font-style:italic;font-weight:400;font-size:30px}
     .library-title span{display:block;font-family:var(--sans);font-style:normal;font-size:13px;color:var(--ink-soft);font-weight:400;margin-top:3px}
-    .library-actions{display:flex;gap:12px;align-items:center;margin-top:6px}
-    .upload-btn{background:var(--accent);color:#fff;border:none;padding:10px 20px;border-radius:999px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
-    .upload-btn:hover{background:var(--accent-h)}
+    .library-actions{display:flex;gap:10px;align-items:center;margin-top:4px;flex-wrap:wrap}
+    .upload-btn{background:var(--accent);color:#fff;border:none;padding:10px 20px;border-radius:999px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .15s,transform .1s;display:flex;align-items:center;gap:6px}
+    .upload-btn:hover{background:var(--accent-h);transform:translateY(-1px)}
     .upload-btn input{display:none}
     .logout-link,.disconnect-btn{background:none;border:none;color:var(--ink-soft);font-size:12px;cursor:pointer;text-decoration:underline}
     .upload-progress{font-size:13px;color:var(--ink-soft);margin-bottom:14px;padding:10px 14px;background:#fff;border:1px solid var(--line);border-radius:var(--r);display:none}
-    .doc-list{display:flex;flex-direction:column;gap:10px}
-    .doc-item{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid var(--line);border-radius:12px;padding:17px 20px;cursor:pointer;transition:background .12s,transform .1s}
-    .doc-item:hover{background:var(--accent-soft);transform:translateX(2px)}
-    .doc-title{font-size:14px;font-weight:500;margin-bottom:3px}
-    .doc-meta{font-size:12px;color:var(--ink-soft)}
-    .doc-arrow{color:var(--ink-soft);font-size:18px}
-    .empty-lib{color:var(--ink-soft);font-size:14px;text-align:center;padding:64px 20px;line-height:1.8}
 
+    /* Filtro de categorías */
+    .category-filter-bar{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
+    .cat-chip{padding:6px 14px;border-radius:999px;font-size:12px;font-weight:500;cursor:pointer;border:1.5px solid var(--line);background:#fff;color:var(--ink-soft);transition:all .15s}
+    .cat-chip:hover{border-color:var(--accent);color:var(--accent)}
+    .cat-chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+    /* Grid de libros */
+    .doc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
+    .doc-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px;cursor:pointer;transition:all .2s;position:relative;display:flex;flex-direction:column;gap:10px;box-shadow:0 2px 8px rgba(38,36,33,.06)}
+    .doc-card:hover{transform:translateY(-3px);box-shadow:0 12px 32px rgba(38,36,33,.14);border-color:var(--accent-soft)}
+    .doc-card-emoji{font-size:28px;line-height:1}
+    .doc-card-title{font-size:14px;font-weight:600;line-height:1.35;color:var(--ink)}
+    .doc-card-meta{font-size:11.5px;color:var(--ink-soft);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .doc-category-chip{background:var(--accent-soft);color:var(--accent);border-radius:4px;padding:2px 7px;font-size:10.5px;font-weight:600}
+    .doc-progress-wrap{background:var(--line);border-radius:999px;height:4px;width:100%;overflow:hidden}
+    .doc-progress-bar{background:var(--accent);height:4px;border-radius:999px;transition:width .4s ease}
+    .doc-progress-label{font-size:11px;color:var(--ink-soft)}
+    .doc-card-actions{display:flex;gap:6px;margin-top:4px}
+    .doc-btn{background:none;border:1px solid var(--line);color:var(--ink-soft);font-size:11.5px;padding:5px 10px;border-radius:7px;cursor:pointer;transition:all .12s;font-family:var(--sans)}
+    .doc-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+    .doc-btn.danger:hover{border-color:var(--danger);color:var(--danger);background:rgba(180,67,58,.07)}
+    .empty-lib{color:var(--ink-soft);font-size:14px;text-align:center;padding:64px 20px;line-height:1.8;grid-column:1/-1}
+
+    /* Banner "próximamente" */
+    .coming-soon-banner{background:linear-gradient(135deg,#201E1B 0%,#3F6E63 100%);color:#fff;border-radius:14px;padding:18px 22px;display:flex;align-items:center;gap:14px;margin-bottom:24px}
+    .csb-icon{font-size:26px;flex-shrink:0}
+    .csb-text{font-size:13px;line-height:1.5;opacity:.9}
+    .csb-text strong{display:block;font-size:14px;opacity:1;margin-bottom:2px}
+
+    /* ---- READER ---- */
     .reader-header{position:sticky;top:0;z-index:20}
     .spine{background:var(--spine);color:var(--spine-text);display:flex;align-items:center;gap:10px;padding:9px 16px;flex-wrap:wrap}
     .brand{font-family:var(--serif);font-style:italic;font-size:18px;margin-right:4px;white-space:nowrap;cursor:pointer;opacity:.85;user-select:none}
     .brand:hover{opacity:1}
     .spine-sep{width:1px;height:20px;background:rgba(255,255,255,.12);flex-shrink:0}
-    .spine-btn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:var(--spine-text);padding:6px 12px;border-radius:999px;font-size:13px;cursor:pointer;white-space:nowrap;line-height:1}
+    .spine-btn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:var(--spine-text);padding:6px 12px;border-radius:999px;font-size:13px;cursor:pointer;white-space:nowrap;line-height:1;transition:background .12s}
     .spine-btn:hover{background:rgba(255,255,255,.16)}
     .spine-btn:disabled{opacity:.3;cursor:not-allowed}
     .spine-btn.active{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.38)}
@@ -82,6 +112,9 @@
     .sync-dot{width:7px;height:7px;border-radius:50%;background:#7FAE8C;flex-shrink:0}
     .sync-dot.saving{background:#E9B949;animation:pulse 1s ease-in-out infinite}
     @keyframes pulse{0%,100%{opacity:.9}50%{opacity:.35}}
+
+    /* Streak badge en spine */
+    .streak-badge{display:flex;align-items:center;gap:4px;background:rgba(233,185,73,.18);border:1px solid rgba(233,185,73,.35);border-radius:999px;padding:4px 10px;font-size:12px;color:#E9B949;white-space:nowrap}
 
     .search-bar-row{background:#181512;padding:7px 14px;display:flex;gap:8px;align-items:center;border-top:1px solid rgba(255,255,255,.05)}
     .search-bar-row.hidden{display:none}
@@ -105,7 +138,8 @@
     .highlight-layer{position:absolute;inset:0;pointer-events:none}
     .hl-rect{position:absolute;mix-blend-mode:multiply;border-radius:2px;pointer-events:auto;cursor:pointer}
 
-    /* ---- MUCHO más visible la selección de texto ---- */
+    /* Cursor de selección más visible */
+    .textLayer{cursor:text}
     .textLayer ::selection{background:rgba(63,110,99,.55) !important}
     .textLayer ::-moz-selection{background:rgba(63,110,99,.55) !important}
 
@@ -114,18 +148,19 @@
     .selection-toolbar .swatch-dot:hover{transform:scale(1.2);box-shadow:0 0 0 2px rgba(255,255,255,.35)}
     .selection-toolbar::after{content:'';position:absolute;left:50%;bottom:-5px;transform:translateX(-50%);border-width:5px 5px 0 5px;border-style:solid;border-color:var(--spine) transparent transparent transparent}
     .sel-divider{width:1px;height:16px;background:rgba(255,255,255,.22)}
-    .explain-btn{background:rgba(255,255,255,.1);color:var(--spine-text);border:1px solid rgba(255,255,255,.28);border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer;white-space:nowrap}
+    .explain-btn{background:rgba(255,255,255,.1);color:var(--spine-text);border:1px solid rgba(255,255,255,.28);border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer;white-space:nowrap;transition:background .12s}
     .explain-btn:hover{background:rgba(255,255,255,.2)}
     .margin-strip{width:14px;align-self:stretch;position:relative;border-left:1px dashed var(--line)}
     .tick{position:absolute;left:3px;width:8px;height:3px;border-radius:2px;cursor:pointer}
     .tick:hover{transform:scaleX(1.5)}
 
-    .sidebar{width:300px;background:var(--sidebar-bg);border-left:1px solid var(--line);overflow:hidden;flex-shrink:0;display:flex;flex-direction:column}
+    /* ---- SIDEBAR ---- */
+    .sidebar{width:310px;background:var(--sidebar-bg);border-left:1px solid var(--line);overflow:hidden;flex-shrink:0;display:flex;flex-direction:column}
     .sidebar.hidden{display:none}
     .sidebar-tabs{display:flex;border-bottom:1px solid var(--line);flex-shrink:0;overflow-x:auto}
     .sidebar-tabs::-webkit-scrollbar{display:none}
-    .sidebar-tabs button{flex-shrink:0;background:none;border:none;padding:11px 8px;font-size:11.5px;cursor:pointer;color:var(--ink-soft);border-bottom:2px solid transparent;white-space:nowrap}
-    .sidebar-tabs button.active{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+    .sidebar-tabs button{flex-shrink:0;background:none;border:none;padding:11px 7px;font-size:11px;cursor:pointer;color:var(--ink-soft);border-bottom:2px solid transparent;white-space:nowrap;font-family:var(--sans);font-weight:500}
+    .sidebar-tabs button.active{color:var(--ink);border-bottom-color:var(--accent);font-weight:700}
     .fc-badge{display:inline-block;background:var(--accent);color:#fff;border-radius:99px;font-size:9px;padding:1px 5px;margin-left:3px;font-weight:700;vertical-align:middle}
     .sidebar-body{flex:1;overflow-y:auto;display:flex;flex-direction:column}
 
@@ -167,6 +202,23 @@
     .fc-delete-btn{background:none;border:1px solid var(--line);color:var(--ink-soft);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;align-self:center}
     .fc-delete-btn:hover{border-color:#B4433A;color:#B4433A}
 
+    /* ---- GLOSARIO ---- */
+    .glossary-search-wrap{padding:10px 12px;border-bottom:1px solid var(--line);flex-shrink:0}
+    .glossary-search{width:100%;padding:7px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:var(--sans);outline:none;background:#fff}
+    .glossary-search:focus{border-color:var(--accent)}
+    .glossary-item{padding:11px 14px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:4px;cursor:pointer;transition:background .1s}
+    .glossary-item:hover{background:var(--accent-soft)}
+    .glossary-term{font-size:13px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:8px}
+    .glossary-level-tag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;text-transform:uppercase;letter-spacing:.04em}
+    .lvl-simple{background:#E6F4F1;color:#2A7A6B}
+    .lvl-intermedio{background:#EEF0FB;color:#4051B5}
+    .lvl-tecnico{background:#FDF0F0;color:#B4433A}
+    .glossary-def{font-size:12px;color:var(--ink-soft);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .glossary-page{font-size:10.5px;color:var(--ink-soft)}
+    .glossary-actions{display:flex;gap:6px;margin-top:4px}
+    .glossary-del{background:none;border:none;color:var(--ink-soft);font-size:11px;cursor:pointer;padding:0;text-decoration:underline}
+    .glossary-del:hover{color:var(--danger)}
+
     /* ---- CHAT ---- */
     .chat-panel{display:flex;flex-direction:column;height:100%}
     .thread-bar{display:flex;align-items:center;gap:6px;padding:7px 10px;border-bottom:1px solid var(--line);flex-shrink:0}
@@ -185,14 +237,10 @@
     .chat-key-input:focus{border-color:var(--accent)}
     .chat-messages{flex:1;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:10px}
     .chat-msg{font-size:13px;line-height:1.55;padding:9px 13px;border-radius:12px;max-width:93%;white-space:pre-wrap;word-break:break-word}
-    .chat-msg.user{align-self:flex-end;background:var(--accent);color:#fff;border-radius:12px 12px 3px 12px}
-    .chat-msg.model{align-self:flex-start;background:#fff;border:1px solid var(--line);border-radius:12px 12px 12px 3px}
-    .chat-msg.pending{color:var(--ink-soft);font-style:italic;background:#fff;border:1px solid var(--line)}
     .chat-cite-block{background:rgba(255,255,255,0.2);color:#fff;padding:6px 10px;border-radius:8px;font-size:11px;font-style:italic;margin-bottom:8px;border-left:3px solid rgba(255,255,255,0.5);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis}
     .chat-msg-wrap{display:flex;flex-direction:column;gap:3px;max-width:93%}
     .chat-msg-wrap.user{align-self:flex-end;align-items:flex-end}
     .chat-msg-wrap.model{align-self:flex-start;align-items:flex-start}
-    .chat-msg{font-size:13px;line-height:1.55;padding:9px 13px;border-radius:12px;white-space:pre-wrap;word-break:break-word}
     .chat-msg-wrap.user .chat-msg{background:var(--accent);color:#fff;border-radius:12px 12px 3px 12px}
     .chat-msg-wrap.model .chat-msg{background:#fff;border:1px solid var(--line);border-radius:12px 12px 12px 3px}
     .chat-msg-wrap .chat-msg.pending{color:var(--ink-soft);font-style:italic;background:#fff;border:1px solid var(--line)}
@@ -213,25 +261,31 @@
     .chat-send-btn:hover{background:var(--accent-h)}
     .chat-send-btn:disabled{opacity:.45;cursor:not-allowed}
 
-    /* ---- PANEL FLOTANTE de explicación (NO bloquea lectura) ---- */
-    .explain-panel{position:fixed;bottom:20px;right:20px;width:420px;max-height:70vh;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 16px 60px rgba(0,0,0,.22);z-index:100;display:flex;flex-direction:column;animation:panelIn .25s ease}
+    /* ---- PANEL FLOTANTE de explicación ---- */
+    .explain-panel{position:fixed;bottom:20px;right:20px;width:430px;max-height:75vh;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 16px 60px rgba(0,0,0,.22);z-index:100;display:flex;flex-direction:column;animation:panelIn .25s ease}
     @keyframes panelIn{from{transform:translateY(30px) scale(.96);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
     .explain-panel-header{display:flex;justify-content:space-between;align-items:flex-start;padding:16px 18px 12px;border-bottom:1px solid var(--line);flex-shrink:0}
     .explain-panel-term{font-family:var(--serif);font-style:italic;font-size:18px;color:var(--ink);font-weight:400;line-height:1.25;flex:1;margin-right:10px}
     .explain-panel-page{font-size:11px;color:var(--ink-soft);margin-top:3px}
     .explain-panel-close{background:none;border:1px solid var(--line);color:var(--ink-soft);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
     .explain-panel-close:hover{background:var(--accent-soft);color:var(--ink)}
-    .explain-panel-body{flex:1;overflow-y:auto;padding:16px 18px;font-size:14px;line-height:1.7;color:var(--ink)}
+    /* Niveles de explicación */
+    .explain-levels-row{display:flex;gap:6px;padding:10px 18px 0;flex-shrink:0}
+    .explain-level-btn{flex:1;padding:6px 4px;border-radius:7px;font-size:11.5px;font-weight:600;cursor:pointer;border:1.5px solid var(--line);background:#fff;color:var(--ink-soft);transition:all .15s;font-family:var(--sans);text-align:center}
+    .explain-level-btn:hover{border-color:var(--accent);color:var(--accent)}
+    .explain-level-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .explain-panel-body{flex:1;overflow-y:auto;padding:14px 18px;font-size:14px;line-height:1.7;color:var(--ink)}
     .explain-panel-body .explain-loading{display:flex;align-items:center;gap:12px;color:var(--ink-soft);font-size:13px;padding:10px 0}
     .explain-panel-body .spinner{width:22px;height:22px;border-width:2px}
     .explain-panel-body .explain-text{white-space:pre-wrap;word-break:break-word}
     .explain-panel-footer{display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--line);flex-shrink:0}
-    .epf-btn{flex:1;padding:9px 10px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;text-align:center;border:1px solid var(--line);background:#fff;color:var(--ink);transition:all .12s}
+    .epf-btn{flex:1;padding:9px 10px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;text-align:center;border:1px solid var(--line);background:#fff;color:var(--ink);transition:all .12s;font-family:var(--sans)}
     .epf-btn:hover{background:var(--accent-soft);border-color:var(--accent)}
     .epf-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
     .epf-btn.primary:hover{background:var(--accent-h)}
     .epf-btn:disabled{opacity:.4;cursor:not-allowed}
-    /* ---- POPUP DE PREGUNTA (aparece cerca de la selección) ---- */
+
+    /* ---- POPUP DE PREGUNTA ---- */
     .ask-popup{position:fixed;bottom:20px;right:20px;width:380px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 16px 60px rgba(0,0,0,.22);z-index:100;display:flex;flex-direction:column;animation:panelIn .2s ease;overflow:hidden}
     .ask-popup-header{padding:12px 16px 10px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-shrink:0}
     .ask-popup-cite{font-size:12px;color:var(--ink-soft);font-style:italic;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -244,30 +298,78 @@
     .ask-popup-input::placeholder{color:var(--ink-soft)}
     .ask-popup-send{background:var(--accent);color:#fff;border:none;border-radius:10px;width:38px;height:38px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .12s}
     .ask-popup-send:hover{background:var(--accent-h)}
-    /* ============================================================
-       MOBILE / TOUCH OPTIMIZATIONS
-       ============================================================ */
 
-    /* Prevent iOS auto-zoom on inputs */
+    /* ---- BANNER ¿DÓNDE ME QUEDÉ? ---- */
+    .resume-banner{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(32,30,27,.7);backdrop-filter:blur(8px);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;animation:fadeIn .3s ease}
+    .resume-banner-card{background:#fff;border-radius:20px;padding:32px 30px;max-width:480px;width:100%;box-shadow:0 24px 72px rgba(0,0,0,.28);position:relative}
+    .resume-banner-tag{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+    .resume-banner-title{font-family:var(--serif);font-style:italic;font-size:22px;color:var(--ink);margin-bottom:14px;line-height:1.3}
+    .resume-banner-summary{font-size:14px;line-height:1.7;color:var(--ink-soft);white-space:pre-wrap}
+    .resume-banner-page{display:inline-block;margin-top:14px;background:var(--accent-soft);color:var(--accent);border-radius:8px;padding:5px 12px;font-size:13px;font-weight:600}
+    .resume-banner-actions{display:flex;gap:10px;margin-top:20px}
+    .resume-banner-continue{flex:1;background:var(--accent);color:#fff;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s;font-family:var(--sans)}
+    .resume-banner-continue:hover{background:var(--accent-h)}
+    .resume-banner-dismiss{background:none;border:1px solid var(--line);color:var(--ink-soft);padding:12px 18px;border-radius:10px;font-size:14px;cursor:pointer;font-family:var(--sans);transition:all .12s}
+    .resume-banner-dismiss:hover{border-color:var(--ink-soft);color:var(--ink)}
+    .resume-spinner{display:flex;align-items:center;gap:12px;color:var(--ink-soft);font-size:13px;margin-top:8px}
+
+    /* ---- QUIZ POPUP ---- */
+    .quiz-popup{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:420px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 16px 60px rgba(0,0,0,.28);z-index:150;animation:panelIn .25s ease;overflow:hidden}
+    .quiz-popup-header{background:linear-gradient(135deg,#201E1B 0%,#3F6E63 100%);padding:16px 18px 14px;color:#fff}
+    .quiz-popup-tag{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.7;margin-bottom:4px}
+    .quiz-popup-q{font-size:14px;line-height:1.55}
+    .quiz-popup-body{padding:16px 18px}
+    .quiz-textarea{width:100%;resize:none;border:1px solid var(--line);border-radius:10px;padding:10px 13px;font-family:var(--sans);font-size:13px;min-height:70px;outline:none;line-height:1.5;color:var(--ink)}
+    .quiz-textarea:focus{border-color:var(--accent)}
+    .quiz-popup-actions{display:flex;gap:8px;padding:0 18px 16px}
+    .quiz-submit-btn{flex:1;background:var(--accent);color:#fff;border:none;padding:10px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+    .quiz-submit-btn:hover{background:var(--accent-h)}
+    .quiz-skip-btn{background:none;border:1px solid var(--line);color:var(--ink-soft);padding:10px 16px;border-radius:9px;font-size:13px;cursor:pointer;font-family:var(--sans)}
+    .quiz-feedback{padding:14px 18px 18px;font-size:13px;line-height:1.6;color:var(--ink);border-top:1px solid var(--line);background:var(--accent-soft)}
+    .quiz-close-btn{display:block;width:100%;background:none;border:none;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;padding:10px;font-family:var(--sans)}
+
+    /* ---- CHAPTER PREVIEW BANNER ---- */
+    .chapter-preview{position:fixed;top:70px;left:50%;transform:translateX(-50%);width:420px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 44px rgba(0,0,0,.2);z-index:90;animation:panelIn .22s ease;overflow:hidden}
+    .chapter-preview-header{background:var(--spine);padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
+    .chapter-preview-title{color:var(--spine-text);font-size:13px;font-weight:600;opacity:.9}
+    .chapter-preview-close{background:none;border:none;color:rgba(255,255,255,.6);cursor:pointer;font-size:16px;padding:0;line-height:1}
+    .chapter-preview-close:hover{color:#fff}
+    .chapter-preview-body{padding:14px 16px;font-size:13px;line-height:1.65;color:var(--ink-soft)}
+    .chapter-preview-chapter{font-family:var(--serif);font-style:italic;font-size:16px;color:var(--ink);margin-bottom:8px}
+
+    /* ---- TOAST DE LOGRO ---- */
+    .achievement-toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--spine);color:#fff;border-radius:999px;padding:12px 24px;font-size:14px;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,.3);z-index:300;animation:toastIn .35s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;display:flex;align-items:center;gap:10px}
+    @keyframes toastIn{from{transform:translateX(-50%) translateY(30px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}
+    .toast-emoji{font-size:20px}
+
+    /* ---- MODAL EDICIÓN LIBRO ---- */
+    .modal-overlay{position:fixed;inset:0;background:rgba(32,30,27,.6);backdrop-filter:blur(6px);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeIn .2s ease}
+    .modal-card{background:#fff;border-radius:18px;padding:28px;max-width:400px;width:100%;box-shadow:0 24px 72px rgba(0,0,0,.28)}
+    .modal-title{font-size:17px;font-weight:700;margin-bottom:18px}
+    .modal-field{margin-bottom:14px}
+    .modal-field label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
+    .modal-field input,.modal-field select{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:var(--r);font-size:14px;font-family:var(--sans);outline:none;transition:border-color .15s;background:#fff}
+    .modal-field input:focus,.modal-field select:focus{border-color:var(--accent)}
+    .modal-actions{display:flex;gap:10px;margin-top:20px}
+    .modal-save{flex:1;background:var(--accent);color:#fff;border:none;padding:11px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+    .modal-save:hover{background:var(--accent-h)}
+    .modal-cancel{background:none;border:1px solid var(--line);color:var(--ink-soft);padding:11px 16px;border-radius:10px;font-size:14px;cursor:pointer;font-family:var(--sans)}
+
+    /* ============================================================
+       MOBILE
+       ============================================================ */
     @media(max-width:640px){
       input,textarea,select{font-size:16px !important}
-
-      /* Toolbar: compact & scrollable */
       .spine{padding:8px 10px;gap:6px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
       .spine::-webkit-scrollbar{display:none}
       .spine-sep{display:none !important}
       .page-total{display:none}
       .spine-btn{padding:8px 12px;min-height:38px}
-
-      /* PDF stage: less padding, hide margin strip */
       .stage{padding:16px 6px 120px}
       .margin-strip{display:none}
-
-      /* Library */
       .library-wrap{padding:24px 16px 40px}
       .library-header{flex-direction:column;gap:14px}
-
-      /* Sidebar: bottom sheet */
+      .doc-grid{grid-template-columns:1fr}
       .sidebar{
         position:fixed !important;
         left:0 !important;right:0 !important;bottom:0 !important;
@@ -282,71 +384,24 @@
         transform:translateY(0);
         transition:transform .32s cubic-bezier(.32,.72,0,1);
       }
-      .sidebar.hidden{
-        transform:translateY(110%);
-        pointer-events:none;
-        visibility:hidden;
-      }
-
-      /* Selection toolbar: bigger touch targets */
+      .sidebar.hidden{transform:translateY(110%);pointer-events:none;visibility:hidden}
       .selection-toolbar{padding:10px 16px;gap:10px}
       .selection-toolbar .swatch-dot{width:28px;height:28px}
       .explain-btn{padding:8px 16px;font-size:13px;min-height:36px}
-
-      /* Explain & Ask panels: bottom sheet */
-      .explain-panel{
-        left:0 !important;right:0 !important;bottom:0 !important;
-        width:100% !important;
-        border-radius:20px 20px 0 0 !important;
-        max-height:62vh;
-      }
-      .ask-popup{
-        left:0 !important;right:0 !important;bottom:0 !important;
-        width:100% !important;
-        border-radius:20px 20px 0 0 !important;
-      }
-
-      /* Chat actions always visible on touch */
+      .explain-panel{left:0 !important;right:0 !important;bottom:0 !important;width:100% !important;border-radius:20px 20px 0 0 !important;max-height:68vh}
+      .ask-popup{left:0 !important;right:0 !important;bottom:0 !important;width:100% !important;border-radius:20px 20px 0 0 !important}
+      .quiz-popup{left:12px !important;right:12px !important;transform:none !important;width:auto !important;bottom:16px}
+      .chapter-preview{left:12px !important;right:12px !important;transform:none !important;width:auto !important}
       .chat-msg-actions{display:flex !important}
+      .streak-badge{display:none}
     }
 
-    /* Backdrop for bottom sheet sidebar */
-    .sidebar-backdrop{
-      display:none;
-      position:fixed;
-      inset:0;
-      background:rgba(0,0,0,.45);
-      z-index:49;
-      -webkit-backdrop-filter:blur(3px);
-      backdrop-filter:blur(3px);
-      animation:fadeIn .22s ease;
-    }
+    .sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:49;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);animation:fadeIn .22s ease}
     .sidebar-backdrop.visible{display:block}
     @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-
-    /* Drag handle for bottom sheet */
-    .sidebar-handle{
-      display:none;
-      flex-shrink:0;
-      width:36px;height:4px;
-      background:var(--line);
-      border-radius:2px;
-      margin:10px auto 0;
-    }
+    .sidebar-handle{display:none;flex-shrink:0;width:36px;height:4px;background:var(--line);border-radius:2px;margin:10px auto 0}
     @media(max-width:640px){.sidebar-handle{display:block}}
-
-    /* Mobile close button inside sidebar tabs */
-    .sidebar-close-btn{
-      display:none;
-      margin-left:auto;
-      background:none;
-      border:none;
-      color:var(--ink-soft);
-      font-size:18px;
-      padding:8px 10px;
-      cursor:pointer;
-      flex-shrink:0;
-    }
+    .sidebar-close-btn{display:none;margin-left:auto;background:none;border:none;color:var(--ink-soft);font-size:18px;padding:8px 10px;cursor:pointer;flex-shrink:0}
     @media(max-width:640px){.sidebar-close-btn{display:block}}
   </style>
 </head>
@@ -370,13 +425,18 @@ const COLORS = [
 const GEMINI_KEY_LS  = 'readily_gemini_key';
 const SB_URL_LS      = 'readily_sb_url';
 const SB_KEY_LS      = 'readily_sb_key';
+const EXPLAIN_LVL_LS = 'readily_explain_level';
 const GEMINI_API     = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 const MAX_CTX        = 30;
+const QUIZ_EVERY_N   = 5; // páginas entre quizzes
+
+const CATEGORIES = ['Sin categoría','Ciencia','Tecnología','Historia','Literatura','Filosofía','Arte','Economía','Medicina','Matemáticas','Derecho','Otro'];
 
 const state = {
   view:'connect', sb:null, session:null,
   authMode:'login', authError:'',
   documents:[], currentDoc:null,
+  docProgresses:{}, // map docId -> {page, updated_at}
   pdf:null, pageNum:1, numPages:0, scale:1.25,
   highlights:[], sidebarOpen:true, saving:false,
   sidebarTab:'highlights',
@@ -388,27 +448,27 @@ const state = {
   tocEntries:[],
   flashcards:[], flashcardIdx:0,
   chatCitation:'',
-  // Explain panel state — persiste mientras lees
   explainTerm:'', explainText:'', explainPage:0, explainVisible:false, explainLoading:false,
+  explainLevel: localStorage.getItem(EXPLAIN_LVL_LS) || 'intermedio',
+  glossary:[],
+  glossaryFilter:'',
+  activeCategory:'all',
+  quizLastPage:0,
+  readingStreak:0,
 };
 
 const root = document.getElementById('app-root');
 const uid  = () => 'h' + Math.random().toString(36).slice(2, 10);
 const esc  = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-// ---- Limpiar texto seleccionado del PDF ----
 function cleanSelectedText(raw, pageNum) {
-  // 1. Normalizar espacios y puntos sueltos
   let t = raw.replace(/\s+/g, ' ').trim();
-  // 2. Quitar puntos aislados al inicio/final (artefactos de PDF)
   t = t.replace(/^[.\s]+/, '').replace(/[.\s]+$/, '');
-  // 3. Si el texto es muy corto y parece cortado, intentar buscar la palabra completa en el índice
   if (t.length < 20 && state.searchIndex.length > 0) {
     const pageData = state.searchIndex.find(p => p.page === pageNum);
     if (pageData) {
       const idx = pageData.text.toLowerCase().indexOf(t.toLowerCase());
       if (idx !== -1) {
-        // Expandir a la palabra completa (bordes de palabra)
         let start = idx, end = idx + t.length;
         while (start > 0 && /\S/.test(pageData.text[start - 1])) start--;
         while (end < pageData.text.length && /\S/.test(pageData.text[end])) end++;
@@ -501,34 +561,170 @@ function renderAuth() {
 async function loadDocuments() {
   const { data } = await state.sb.from('documents').select('*').order('created_at', { ascending: false });
   state.documents = data || [];
+  // Cargar progreso de lectura de todos los docs
+  if (state.documents.length > 0) {
+    const ids = state.documents.map(d => d.id);
+    const { data: progs } = await state.sb.from('reading_progress').select('document_id,page,updated_at').in('document_id', ids);
+    state.docProgresses = {};
+    (progs || []).forEach(p => { state.docProgresses[p.document_id] = { page: p.page, updated_at: p.updated_at }; });
+    // Calcular racha de días (días consecutivos con lectura)
+    const dates = (progs || []).map(p => p.updated_at ? new Date(p.updated_at).toDateString() : null).filter(Boolean);
+    const uniqueDates = [...new Set(dates)].sort();
+    let streak = 0;
+    const today = new Date();
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(today); d.setDate(today.getDate() - i);
+      if (uniqueDates.includes(d.toDateString())) streak++;
+      else break;
+    }
+    state.readingStreak = streak;
+  }
+}
+
+function getCategoryEmoji(cat) {
+  const map = {'Ciencia':'🔬','Tecnología':'💻','Historia':'📜','Literatura':'📖','Filosofía':'🧠','Arte':'🎨','Economía':'📈','Medicina':'⚕️','Matemáticas':'∑','Derecho':'⚖️','Otro':'📄','Sin categoría':'📚'};
+  return map[cat] || '📚';
 }
 
 function renderLibrary() {
+  const allCats = ['all', ...new Set(state.documents.map(d => d.category || 'Sin categoría'))];
+  const filtered = state.activeCategory === 'all'
+    ? state.documents
+    : state.documents.filter(d => (d.category || 'Sin categoría') === state.activeCategory);
+
   root.innerHTML = `
     <div class="library-wrap">
       <div class="library-header">
-        <h1 class="library-title">Readily<span>Tu biblioteca personal</span></h1>
+        <h1 class="library-title">Readily<span>Tu biblioteca personal${state.readingStreak > 1 ? ` · 🔥 ${state.readingStreak} días seguidos` : ''}</span></h1>
         <div class="library-actions">
-          <label class="upload-btn">+ Subir PDF<input id="upload-input" type="file" accept="application/pdf" multiple></label>
+          <label class="upload-btn" id="upload-label">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Subir PDF
+            <input id="upload-input" type="file" accept="application/pdf" multiple>
+          </label>
           <button class="logout-link" id="logout-btn">Cerrar sesión</button>
         </div>
       </div>
+
+      <div class="coming-soon-banner">
+        <span class="csb-icon">🔭</span>
+        <div class="csb-text">
+          <strong>Próximamente</strong>
+          Lectura y análisis inteligente de imágenes, esquemas, diagramas y fórmulas dentro de tus PDFs.
+        </div>
+      </div>
+
+      ${allCats.length > 1 ? `
+      <div class="category-filter-bar" id="cat-filter">
+        ${allCats.map(c => `<button class="cat-chip ${state.activeCategory===c?'active':''}" data-cat="${esc(c)}">${c === 'all' ? '📚 Todos' : getCategoryEmoji(c) + ' ' + esc(c)}</button>`).join('')}
+      </div>` : ''}
+
       <div class="upload-progress" id="upload-progress"></div>
-      <div class="doc-list" id="doc-list">
-        ${state.documents.length === 0
-          ? '<div class="empty-lib">📚<br><br>Tu biblioteca está vacía.<br>Sube tu primer PDF.</div>'
-          : state.documents.map(d => `
-            <div class="doc-item" data-id="${d.id}">
-              <div><div class="doc-title">${esc(d.title)}</div><div class="doc-meta">${d.num_pages||''} páginas</div></div>
-              <span class="doc-arrow">→</span>
-            </div>`).join('')}
+      <div class="doc-grid" id="doc-list">
+        ${filtered.length === 0
+          ? '<div class="empty-lib">📚<br><br>No hay libros en esta categoría.<br>¡Sube tu primer PDF!</div>'
+          : filtered.map(d => renderDocCard(d)).join('')}
       </div>
       <div style="text-align:center;margin-top:36px"><button class="disconnect-btn" id="disc-btn">Cambiar base de datos</button></div>
     </div>`;
+
   document.getElementById('upload-input').onchange = onUpload;
   document.getElementById('logout-btn').onclick = async () => { await state.sb.auth.signOut(); state.session=null; state.view='auth'; render(); };
   document.getElementById('disc-btn').onclick = () => { localStorage.removeItem(SB_URL_LS); localStorage.removeItem(SB_KEY_LS); state.sb=null; state.session=null; state.view='connect'; render(); };
-  document.querySelectorAll('.doc-item').forEach(el => el.onclick = () => openDocument(el.dataset.id));
+
+  // Category filter
+  document.querySelectorAll('.cat-chip').forEach(el => el.onclick = () => { state.activeCategory = el.dataset.cat; renderLibrary(); });
+
+  // Doc card actions
+  document.querySelectorAll('.doc-card-open').forEach(el => el.onclick = e => { e.stopPropagation(); openDocument(el.dataset.id); });
+  document.querySelectorAll('.doc-card-edit').forEach(el => el.onclick = e => { e.stopPropagation(); openEditModal(el.dataset.id); });
+  document.querySelectorAll('.doc-card-delete').forEach(el => el.onclick = e => { e.stopPropagation(); deleteDocument(el.dataset.id); });
+  document.querySelectorAll('.doc-card').forEach(el => { el.ondblclick = () => openDocument(el.dataset.id); });
+}
+
+function renderDocCard(d) {
+  const prog = state.docProgresses[d.id];
+  const page = prog?.page || 1;
+  const total = d.num_pages || 1;
+  const pct = Math.round((page / total) * 100);
+  const cat = d.category || 'Sin categoría';
+  const emoji = getCategoryEmoji(cat);
+  const lastRead = prog?.updated_at ? new Date(prog.updated_at).toLocaleDateString('es', {day:'numeric',month:'short'}) : null;
+  return `
+  <div class="doc-card" data-id="${d.id}">
+    <div class="doc-card-emoji">${emoji}</div>
+    <div class="doc-card-title">${esc(d.title)}</div>
+    <div class="doc-card-meta">
+      <span>${total} págs.</span>
+      ${lastRead ? `<span>· ${lastRead}</span>` : ''}
+      <span class="doc-category-chip">${esc(cat)}</span>
+    </div>
+    ${pct > 0 ? `
+    <div>
+      <div class="doc-progress-wrap"><div class="doc-progress-bar" style="width:${pct}%"></div></div>
+      <div class="doc-progress-label" style="margin-top:4px">${pct}% leído · p.${page}/${total}</div>
+    </div>` : ''}
+    <div class="doc-card-actions">
+      <button class="doc-btn doc-card-open" data-id="${d.id}">Abrir →</button>
+      <button class="doc-btn doc-card-edit" data-id="${d.id}">✏️ Editar</button>
+      <button class="doc-btn danger doc-card-delete" data-id="${d.id}">🗑 Borrar</button>
+    </div>
+  </div>`;
+}
+
+function openEditModal(docId) {
+  const doc = state.documents.find(d => d.id === docId);
+  if (!doc) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'edit-modal';
+  overlay.innerHTML = `
+    <div class="modal-card">
+      <div class="modal-title">Editar libro</div>
+      <div class="modal-field"><label>Título</label><input id="edit-title" value="${esc(doc.title)}"></div>
+      <div class="modal-field"><label>Categoría</label>
+        <select id="edit-cat">
+          ${CATEGORIES.map(c => `<option value="${esc(c)}" ${(doc.category||'Sin categoría')===c?'selected':''}>${esc(c)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-cancel" id="edit-cancel">Cancelar</button>
+        <button class="modal-save" id="edit-save">Guardar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('edit-cancel').onclick = () => overlay.remove();
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+  document.getElementById('edit-save').onclick = async () => {
+    const newTitle = document.getElementById('edit-title').value.trim();
+    const newCat = document.getElementById('edit-cat').value;
+    if (!newTitle) return;
+    await state.sb.from('documents').update({ title: newTitle, category: newCat }).eq('id', docId);
+    const d = state.documents.find(x => x.id === docId);
+    if (d) { d.title = newTitle; d.category = newCat; }
+    overlay.remove();
+    renderLibrary();
+  };
+}
+
+async function deleteDocument(docId) {
+  const doc = state.documents.find(d => d.id === docId);
+  if (!doc) return;
+  if (!confirm(`¿Eliminar "${doc.title}"?\n\nEsto borrará el PDF, todos los subrayados y el historial de chat. Esta acción no se puede deshacer.`)) return;
+  renderLoading('Eliminando…');
+  try {
+    await state.sb.storage.from('pdfs').remove([doc.storage_path]);
+    await state.sb.from('highlights').delete().eq('document_id', docId);
+    await state.sb.from('reading_progress').delete().eq('document_id', docId);
+    await state.sb.from('chat_messages').delete().eq('document_id', docId);
+    await state.sb.from('chat_threads').delete().eq('document_id', docId);
+    await state.sb.from('flashcards').delete().eq('document_id', docId);
+    try { await state.sb.from('glossary').delete().eq('document_id', docId); } catch(_) {}
+    await state.sb.from('documents').delete().eq('id', docId);
+    state.documents = state.documents.filter(d => d.id !== docId);
+    delete state.docProgresses[docId];
+    renderLibrary();
+  } catch(err) { alert('Error al eliminar: ' + err.message); renderLibrary(); }
 }
 
 async function onUpload(e) {
@@ -541,7 +737,7 @@ async function onUpload(e) {
     if (error) { alert('Error: ' + error.message); continue; }
     const buf = await f.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-    await state.sb.from('documents').insert({ title: f.name.replace(/\.pdf$/i,''), storage_path: path, num_pages: pdf.numPages, user_id: state.session.user.id });
+    await state.sb.from('documents').insert({ title: f.name.replace(/\.pdf$/i,''), storage_path: path, num_pages: pdf.numPages, user_id: state.session.user.id, category: 'Sin categoría' });
   }
   prog.style.display = 'none'; await loadDocuments(); renderLibrary();
 }
@@ -561,7 +757,8 @@ async function openDocument(docId) {
     state.numPages = state.pdf.numPages;
 
     const { data: prog } = await state.sb.from('reading_progress').select('page').eq('document_id', docId).maybeSingle();
-    state.pageNum = prog?.page || 1;
+    const savedPage = prog?.page || 1;
+    state.pageNum = savedPage;
 
     const { data: hls } = await state.sb.from('highlights').select('*').eq('document_id', docId);
     state.highlights = (hls||[]).map(h => ({ id:h.id, page:h.page, rects:h.rects, color:h.color, text:h.text, note:h.note||'' }));
@@ -578,9 +775,7 @@ async function openDocument(docId) {
       if (nt) {
         state.chatThreads = [nt]; state.currentThreadId = nt.id;
         await state.sb.from('chat_messages').update({ thread_id: nt.id }).eq('document_id', docId).is('thread_id', null);
-      } else {
-        state.chatThreads = []; state.currentThreadId = null;
-      }
+      } else { state.chatThreads = []; state.currentThreadId = null; }
     }
     if (threadsError) {
       console.warn("Supabase chat_threads warning:", threadsError);
@@ -590,19 +785,31 @@ async function openDocument(docId) {
 
     state.tocEntries = (await state.pdf.getOutline()) || [];
 
-    // Flashcards (tabla puede no existir aún)
     try {
       const { data: fcs } = await state.sb.from('flashcards').select('*').eq('document_id', docId).order('created_at');
       state.flashcards = fcs || [];
     } catch (_) { state.flashcards = []; }
     state.flashcardIdx = 0;
 
+    // Glossary
+    try {
+      const { data: gl } = await state.sb.from('glossary').select('*').eq('document_id', docId).order('created_at', { ascending: false });
+      state.glossary = gl || [];
+    } catch(_) { state.glossary = []; }
+
     state.searchQuery=''; state.searchResults=[]; state.searchResultIdx=-1; state.searchBarOpen=false; state.searchIndex=[];
     state.explainVisible=false; state.explainText=''; state.explainTerm='';
+    state.quizLastPage = savedPage;
+    state.glossaryFilter = '';
 
     renderLoading('Indexando texto…');
     state.docFullText = await extractFullText(state.pdf);
     state.view = 'reader'; renderReaderShell();
+
+    // Mostrar banner "¿Dónde me quedé?" si estamos en página > 3
+    if (savedPage > 3 && state.geminiKey) {
+      showResumeBanner(doc, savedPage);
+    }
   } catch (err) { alert('Error: ' + err.message); state.view = 'library'; render(); }
 }
 
@@ -625,6 +832,63 @@ async function extractFullText(pdf) {
 }
 
 // ============================================================
+// "¿Dónde me quedé?" — Banner de resumen
+// ============================================================
+async function showResumeBanner(doc, page) {
+  const overlay = document.createElement('div');
+  overlay.className = 'resume-banner';
+  overlay.id = 'resume-banner';
+  overlay.innerHTML = `
+    <div class="resume-banner-card">
+      <div class="resume-banner-tag">¿Dónde me quedé?</div>
+      <div class="resume-banner-title">${esc(doc.title)}</div>
+      <div class="resume-spinner"><div class="spinner" style="width:20px;height:20px;border-width:2px"></div><span style="font-size:13px;color:var(--ink-soft)">Generando resumen…</span></div>
+      <div class="resume-banner-actions">
+        <button class="resume-banner-dismiss" id="rb-dismiss">Ver sin resumen</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('rb-dismiss').onclick = () => overlay.remove();
+
+  // Obtener contexto de las últimas páginas
+  const fromPage = Math.max(1, page - 5);
+  const pagesCtx = state.searchIndex.filter(p => p.page >= fromPage && p.page <= page).map(p => `[Pág. ${p.page}] ${p.text.slice(0, 500)}`).join('\n\n');
+
+  const prompt = `El usuario estaba leyendo "${doc.title}" y lo dejó en la página ${page} de ${state.numPages}.
+
+Aquí está el texto de las últimas páginas leídas:
+${pagesCtx}
+
+En 2-3 líneas muy breves y fluidas, recuérdale al usuario de qué estaba hablando el libro en esas páginas para que pueda retomar el hilo sin releer. 
+Responde en español, sin títulos ni bullets. Solo un párrafo de 2-3 oraciones cortas y directas.`;
+
+  try {
+    const r = await fetch(`${GEMINI_API}?key=${state.geminiKey}`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ contents: [{ role:'user', parts:[{ text: prompt }] }] })
+    });
+    const d = await r.json();
+    const summary = d.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || null;
+    const card = overlay.querySelector('.resume-banner-card');
+    if (card && summary) {
+      card.innerHTML = `
+        <div class="resume-banner-tag">¿Dónde me quedé?</div>
+        <div class="resume-banner-title">${esc(doc.title)}</div>
+        <div class="resume-banner-summary">${esc(summary)}</div>
+        <div class="resume-banner-page">📖 Retomar en página ${page}</div>
+        <div class="resume-banner-actions">
+          <button class="resume-banner-continue" id="rb-continue">Continuar leyendo →</button>
+          <button class="resume-banner-dismiss" id="rb-dismiss2">Ir al inicio</button>
+        </div>`;
+      document.getElementById('rb-continue').onclick = () => overlay.remove();
+      document.getElementById('rb-dismiss2').onclick = () => { goToPage(1); overlay.remove(); };
+    } else {
+      overlay.remove();
+    }
+  } catch(_) { overlay.remove(); }
+}
+
+// ============================================================
 // Reader shell
 // ============================================================
 function renderReaderShell() {
@@ -643,7 +907,6 @@ function renderReaderShell() {
       </div>
       <div class="sidebar ${state.sidebarOpen?'':'hidden'}" id="sidebar"></div>
     </div>`;
-  // Backdrop for mobile bottom sheet
   const bd = document.createElement('div');
   bd.id = 'sidebar-backdrop'; bd.className = 'sidebar-backdrop';
   bd.onclick = () => toggleSidebar(false);
@@ -657,6 +920,9 @@ function renderReaderShell() {
 // ============================================================
 function renderToolbar() {
   const s = document.getElementById('spine'); if (!s) return;
+  const streakHtml = state.readingStreak > 1
+    ? `<div class="streak-badge">🔥 ${state.readingStreak}</div>`
+    : '';
   s.innerHTML = `
     <span class="brand" id="back-lib">← Readily</span><div class="spine-sep"></div>
     <div class="pagectl">
@@ -669,6 +935,7 @@ function renderToolbar() {
     <button class="spine-btn" id="zi">A+</button>
     <button class="spine-btn ${state.searchBarOpen?'active':''}" id="st">🔍</button>
     <div class="spacer"></div>
+    ${streakHtml}
     <span class="sync-dot ${state.saving?'saving':''}" title="${state.saving?'Guardando…':'Guardado'}"></span>
     <button class="spine-btn" id="ts">${state.sidebarOpen?'✕ Notas':'☰ Notas'}</button>`;
   document.getElementById('back-lib').onclick = () => { state.view='library'; renderLibrary(); };
@@ -724,10 +991,17 @@ function doSearch(q){
   state.searchResults=res;state.searchResultIdx=res.length>0?0:-1;
   if(res.length>0)goToPage(res[0].page);
 }
-function navSearch(d){if(!state.searchResults.length)return;state.searchResultIdx=(state.searchResultIdx+d+state.searchResults.length)%state.searchResults.length;goToPage(state.searchResults[state.searchResultIdx].page);renderSearchBar();renderSRP()}
-function renderSRP(){const p=document.getElementById('search-results-panel');if(!p)return;if(!state.searchBarOpen||!state.searchResults.length){p.innerHTML='';return}
-  p.innerHTML=`<div class="search-results-panel">${state.searchResults.map((r,i)=>`<div class="srp-item ${i===state.searchResultIdx?'active':''}" data-i="${i}"><span class="srp-page">p.${r.page}</span><span class="srp-snippet">${r.snippet}</span></div>`).join('')}</div>`;
-  p.querySelectorAll('.srp-item').forEach(el=>el.onclick=()=>{state.searchResultIdx=+el.dataset.i;goToPage(state.searchResults[state.searchResultIdx].page);renderSearchBar();renderSRP()});
+function navSearch(dir){
+  if(!state.searchResults.length)return;
+  state.searchResultIdx=(state.searchResultIdx+dir+state.searchResults.length)%state.searchResults.length;
+  goToPage(state.searchResults[state.searchResultIdx].page);
+  renderSearchBar();renderSRP();
+}
+function renderSRP(){
+  const panel=document.getElementById('search-results-panel');if(!panel)return;
+  if(!state.searchResults.length||!state.searchQuery){panel.innerHTML='';return}
+  panel.innerHTML=`<div class="search-results-panel">${state.searchResults.slice(0,30).map((r,i)=>`<div class="srp-item ${i===state.searchResultIdx?'active':''}" data-idx="${i}"><span class="srp-page">p.${r.page}</span><span class="srp-snippet">${r.snippet}</span></div>`).join('')}</div>`;
+  panel.querySelectorAll('.srp-item').forEach(el=>{el.onclick=()=>{state.searchResultIdx=parseInt(el.dataset.idx);goToPage(state.searchResults[state.searchResultIdx].page);renderSearchBar();renderSRP()}});
 }
 
 // ============================================================
@@ -735,66 +1009,167 @@ function renderSRP(){const p=document.getElementById('search-results-panel');if(
 // ============================================================
 function renderSidebar() {
   const sb = document.getElementById('sidebar'); if (!sb) return;
-  const hasToc = state.tocEntries.length > 0;
-  const fc = state.flashcards.length;
+  const fcCount = state.flashcards.length;
+  const glCount = state.glossary.length;
   sb.innerHTML = `
     <div class="sidebar-handle"></div>
     <div class="sidebar-tabs">
-      <button id="t-hl" class="${state.sidebarTab==='highlights'?'active':''}">Subrayados</button>
-      ${hasToc?`<button id="t-toc" class="${state.sidebarTab==='toc'?'active':''}">Índice</button>`:''}
-      <button id="t-chat" class="${state.sidebarTab==='chat'?'active':''}">Chat IA</button>
-      <button id="t-fc" class="${state.sidebarTab==='flashcards'?'active':''}">Tarjetas${fc>0?` <span class="fc-badge">${fc}</span>`:''}</button>
+      <button id="st-hl" ${state.sidebarTab==='highlights'?'class="active"':''}>Subrayados</button>
+      <button id="st-toc" ${state.sidebarTab==='toc'?'class="active"':''}>Índice</button>
+      <button id="st-fc" ${state.sidebarTab==='flashcards'?'class="active"':''}>Tarjetas${fcCount?`<span class="fc-badge">${fcCount}</span>`:''}</button>
+      <button id="st-gl" ${state.sidebarTab==='glossary'?'class="active"':''}>Glosario${glCount?`<span class="fc-badge">${glCount}</span>`:''}</button>
+      <button id="st-chat" ${state.sidebarTab==='chat'?'class="active"':''}>Chat IA</button>
       <button class="sidebar-close-btn" id="sb-close">✕</button>
     </div>
     <div class="sidebar-body" id="sb-body"></div>`;
-  document.getElementById('t-hl').onclick=()=>{state.sidebarTab='highlights';renderSidebar()};
-  if(hasToc)document.getElementById('t-toc').onclick=()=>{state.sidebarTab='toc';renderSidebar()};
-  document.getElementById('t-chat').onclick=()=>{state.sidebarTab='chat';renderSidebar()};
-  document.getElementById('t-fc').onclick=()=>{state.sidebarTab='flashcards';renderSidebar()};
-  document.getElementById('sb-close').onclick=()=>toggleSidebar(false);
-  if(state.sidebarTab==='highlights')renderHlTab();
-  else if(state.sidebarTab==='toc')renderTocTab();
-  else if(state.sidebarTab==='chat')renderChatTab();
-  else renderFcTab();
+  document.getElementById('st-hl').onclick   = () => { state.sidebarTab='highlights'; renderSidebar(); };
+  document.getElementById('st-toc').onclick  = () => { state.sidebarTab='toc'; renderSidebar(); };
+  document.getElementById('st-fc').onclick   = () => { state.sidebarTab='flashcards'; renderSidebar(); };
+  document.getElementById('st-gl').onclick   = () => { state.sidebarTab='glossary'; renderSidebar(); };
+  document.getElementById('st-chat').onclick = () => { state.sidebarTab='chat'; renderSidebar(); };
+  document.getElementById('sb-close').onclick = () => toggleSidebar(false);
+  if (state.sidebarTab === 'highlights')  renderHighlightsTab();
+  else if (state.sidebarTab === 'toc')    renderTocTab();
+  else if (state.sidebarTab === 'flashcards') renderFlashcardsTab();
+  else if (state.sidebarTab === 'glossary')   renderGlossaryTab();
+  else renderChatTab();
 }
 
-// ---- Highlights ----
-function renderHlTab(){
-  const b=document.getElementById('sb-body');
-  if(!state.highlights.length){b.innerHTML='<div class="empty-sidebar">Selecciona texto en el documento para crear tu primer subrayado.</div>';return}
-  const sorted=[...state.highlights].sort((a,c)=>a.page-c.page);
-  b.innerHTML=sorted.map(h=>`<div class="hl-item" data-j="${h.page}" data-id="${h.id}"><div class="hl-bar" style="background:${h.color}"></div><div class="hl-body"><div class="hl-page">Página ${h.page}</div><div class="hl-text">"${esc(h.text.length>140?h.text.slice(0,140)+'…':h.text)}"</div><textarea class="hl-note" data-nid="${h.id}" placeholder="Agregar nota…">${esc(h.note||'')}</textarea><div class="hl-actions"><button class="hl-del" data-did="${h.id}">Eliminar</button></div></div></div>`).join('');
-  b.querySelectorAll('.hl-item').forEach(it=>it.onclick=e=>{if(e.target.tagName==='TEXTAREA'||e.target.classList.contains('hl-del'))return;goToPage(+it.dataset.j)});
-  b.querySelectorAll('.hl-note').forEach(ta=>{ta.onclick=e=>e.stopPropagation();ta.onchange=async e=>{const h=state.highlights.find(x=>x.id===e.target.dataset.nid);if(!h)return;h.note=e.target.value;setSaving(true);await state.sb.from('highlights').update({note:h.note}).eq('id',h.id);setSaving(false)}});
-  b.querySelectorAll('.hl-del').forEach(bt=>bt.onclick=async e=>{e.stopPropagation();const id=bt.dataset.did;state.highlights=state.highlights.filter(h=>h.id!==id);renderSidebar();drawHL(state.pageNum);drawMS(state.pageNum);setSaving(true);await state.sb.from('highlights').delete().eq('id',id);setSaving(false)});
+// ---- Subrayados ----
+function renderHighlightsTab() {
+  const b = document.getElementById('sb-body'); if (!b) return;
+  if (!state.highlights.length) { b.innerHTML = '<div class="empty-sidebar">Selecciona texto en el PDF y elige un color para subrayar.</div>'; return; }
+  b.innerHTML = state.highlights.map(h => `
+    <div class="hl-item" data-id="${h.id}">
+      <div class="hl-bar" style="background:${h.color}"></div>
+      <div class="hl-body">
+        <div class="hl-page">Página ${h.page}</div>
+        <div class="hl-text">${esc(h.text.slice(0, 120))}${h.text.length>120?'…':''}</div>
+        <textarea class="hl-note" data-id="${h.id}" placeholder="Nota…">${esc(h.note)}</textarea>
+        <div class="hl-actions">
+          <button data-id="${h.id}" class="hl-go">↗ Ir</button>
+          <button data-id="${h.id}" class="hl-del">🗑 Borrar</button>
+        </div>
+      </div>
+    </div>`).join('');
+  b.querySelectorAll('.hl-item').forEach(el => el.onclick = () => { goToPage(state.highlights.find(h => h.id === el.dataset.id)?.page || state.pageNum); });
+  b.querySelectorAll('.hl-note').forEach(ta => {
+    ta.onclick = e => e.stopPropagation();
+    ta.onchange = async () => {
+      const h = state.highlights.find(x => x.id === ta.dataset.id);
+      if (!h) return; h.note = ta.value;
+      await state.sb.from('highlights').update({ note: ta.value }).eq('id', ta.dataset.id);
+    };
+  });
+  b.querySelectorAll('.hl-go').forEach(btn => { btn.onclick = e => { e.stopPropagation(); const h = state.highlights.find(x => x.id === btn.dataset.id); if (h) goToPage(h.page); }; });
+  b.querySelectorAll('.hl-del').forEach(btn => { btn.onclick = async e => { e.stopPropagation(); const id = btn.dataset.id; state.highlights = state.highlights.filter(h => h.id !== id); await state.sb.from('highlights').delete().eq('id', id); drawHL(state.pageNum); drawMS(state.pageNum); renderSidebar(); }; });
 }
 
 // ---- TOC ----
-function renderTocTab(){
-  const b=document.getElementById('sb-body');
-  if(!state.tocEntries.length){b.innerHTML='<div class="empty-sidebar">Sin tabla de contenidos.</div>';return}
-  function re(items,d){return items.map(it=>{const da=JSON.stringify(it.dest).replace(/"/g,'&quot;');return `<div class="toc-entry d${Math.min(d,2)}" style="padding-left:${14+d*12}px" data-dest="${da}"><span class="toc-title">${esc(it.title||'(sin título)')}</span></div>${it.items?.length?re(it.items,d+1):''}`}).join('')}
-  b.innerHTML=re(state.tocEntries,0);
-  b.querySelectorAll('.toc-entry').forEach(el=>el.onclick=async()=>{try{let dest=JSON.parse(el.dataset.dest.replace(/&quot;/g,'"'));if(typeof dest==='string')dest=await state.pdf.getDestination(dest);if(!Array.isArray(dest))return;goToPage((await state.pdf.getPageIndex(dest[0]))+1)}catch(_){}});
+function renderTocTab() {
+  const b = document.getElementById('sb-body'); if (!b) return;
+  if (!state.tocEntries.length) { b.innerHTML = '<div class="empty-sidebar">Este PDF no tiene índice.</div>'; return; }
+  async function resolvePageNum(dest) {
+    if (!dest) return null;
+    if (Array.isArray(dest) && dest[0]) {
+      try { return (await state.pdf.getPageIndex(dest[0])) + 1; } catch(_) {}
+    }
+    if (typeof dest === 'string') {
+      try { const d = await state.pdf.getDestination(dest); if (d) return (await state.pdf.getPageIndex(d[0])) + 1; } catch(_) {}
+    }
+    return null;
+  }
+  function flattenToc(items, depth) {
+    let out = [];
+    for (const item of items) {
+      out.push({ title: item.title, dest: item.dest || item.url, depth, items: item.items || [] });
+      if (item.items && item.items.length) out = out.concat(flattenToc(item.items, depth + 1));
+    }
+    return out;
+  }
+  const flat = flattenToc(state.tocEntries, 0);
+  b.innerHTML = flat.map((e, i) => `<div class="toc-entry d${Math.min(e.depth,2)}" data-i="${i}" style="padding-left:${14 + e.depth*14}px">${esc(e.title)}</div>`).join('');
+  b.querySelectorAll('.toc-entry').forEach(el => el.onclick = async () => {
+    const item = flat[parseInt(el.dataset.i)];
+    const pn = await resolvePageNum(item.dest);
+    if (pn) goToPage(pn);
+  });
 }
 
 // ---- Flashcards ----
-function renderFcTab(){
-  const b=document.getElementById('sb-body');
-  if(!state.flashcards.length){b.innerHTML='<div class="empty-sidebar">Selecciona un término, pulsa <strong>"✨ Explicar"</strong> y luego <strong>"Guardar tarjeta"</strong> para crear flashcards.</div>';return}
-  const i=Math.min(state.flashcardIdx,state.flashcards.length-1);
-  const c=state.flashcards[i];
-  b.innerHTML=`<div class="fc-container">
-    <div class="fc-nav"><button class="fc-nav-btn" id="fc-p">‹</button><span class="fc-count">${i+1} / ${state.flashcards.length}</span><button class="fc-nav-btn" id="fc-n">›</button></div>
-    <div class="fc-card" id="fc-card"><div class="fc-inner">
-      <div class="fc-front"><p class="fc-term">${esc(c.front)}</p><p class="fc-tap-hint">Toca para ver</p></div>
-      <div class="fc-back"><div class="fc-back-text">${esc(c.back)}</div></div>
-    </div></div>
-    <button class="fc-delete-btn" id="fc-del">🗑 Eliminar</button></div>`;
-  document.getElementById('fc-p').onclick=()=>{state.flashcardIdx=(i-1+state.flashcards.length)%state.flashcards.length;renderFcTab()};
-  document.getElementById('fc-n').onclick=()=>{state.flashcardIdx=(i+1)%state.flashcards.length;renderFcTab()};
-  document.getElementById('fc-card').onclick=()=>document.getElementById('fc-card').classList.toggle('flipped');
-  document.getElementById('fc-del').onclick=async()=>{if(!confirm('¿Eliminar?'))return;setSaving(true);await state.sb.from('flashcards').delete().eq('id',c.id);setSaving(false);state.flashcards.splice(i,1);state.flashcardIdx=Math.max(0,i-1);renderSidebar()};
+function renderFlashcardsTab() {
+  const b = document.getElementById('sb-body'); if (!b) return;
+  if (!state.flashcards.length) { b.innerHTML = '<div class="empty-sidebar">Selecciona texto → ✨ Explicar → 💾 Guardar tarjeta para crear tus primeras tarjetas.</div>'; return; }
+  const idx = Math.min(state.flashcardIdx, state.flashcards.length - 1);
+  const fc = state.flashcards[idx];
+  b.innerHTML = `
+    <div class="fc-container">
+      <div class="fc-nav">
+        <button class="fc-nav-btn" id="fc-p">‹</button>
+        <span class="fc-count">${idx + 1} / ${state.flashcards.length}</span>
+        <button class="fc-nav-btn" id="fc-n">›</button>
+      </div>
+      <div class="fc-card" id="fc-card">
+        <div class="fc-inner">
+          <div class="fc-front"><div class="fc-term">${esc(fc.front)}</div><div class="fc-tap-hint">Toca para ver</div></div>
+          <div class="fc-back"><div class="fc-back-text">${esc(fc.back)}</div></div>
+        </div>
+      </div>
+      <button class="fc-delete-btn" id="fc-del">🗑 Eliminar tarjeta</button>
+    </div>`;
+  document.getElementById('fc-card').onclick = () => document.getElementById('fc-card').classList.toggle('flipped');
+  document.getElementById('fc-p').onclick = () => { state.flashcardIdx = Math.max(0, idx - 1); renderFlashcardsTab(); };
+  document.getElementById('fc-n').onclick = () => { state.flashcardIdx = Math.min(state.flashcards.length - 1, idx + 1); renderFlashcardsTab(); };
+  document.getElementById('fc-del').onclick = async () => {
+    if (!confirm('¿Eliminar esta tarjeta?')) return;
+    await state.sb.from('flashcards').delete().eq('id', fc.id);
+    state.flashcards.splice(idx, 1);
+    state.flashcardIdx = Math.min(idx, state.flashcards.length - 1);
+    renderSidebar();
+  };
+}
+
+// ---- Glosario ----
+function renderGlossaryTab() {
+  const b = document.getElementById('sb-body'); if (!b) return;
+  const q = state.glossaryFilter.toLowerCase();
+  const filtered = q ? state.glossary.filter(g => g.term.toLowerCase().includes(q) || g.definition.toLowerCase().includes(q)) : state.glossary;
+  b.innerHTML = `
+    <div class="glossary-search-wrap">
+      <input class="glossary-search" id="gl-search" placeholder="Buscar en glosario…" value="${esc(state.glossaryFilter)}">
+    </div>
+    ${filtered.length === 0
+      ? `<div class="empty-sidebar">${state.glossary.length === 0 ? 'Selecciona texto y pulsa ✨ Explicar — cada término se guardará aquí.' : 'Sin resultados para "'+esc(state.glossaryFilter)+'".'}</div>`
+      : filtered.map(g => `
+      <div class="glossary-item" data-id="${g.id}">
+        <div class="glossary-term">
+          ${esc(g.term.length > 40 ? g.term.slice(0,40)+'…' : g.term)}
+          <span class="glossary-level-tag lvl-${g.level||'intermedio'}">${g.level||'intermedio'}</span>
+        </div>
+        <div class="glossary-def">${esc(g.definition)}</div>
+        ${g.page ? `<div class="glossary-page">Pág. ${g.page}</div>` : ''}
+        <div class="glossary-actions">
+          <button class="glossary-del" data-id="${g.id}">🗑 Eliminar</button>
+        </div>
+      </div>`).join('')}`;
+  const gs = document.getElementById('gl-search');
+  if (gs) gs.oninput = e => { state.glossaryFilter = e.target.value; renderGlossaryTab(); };
+  b.querySelectorAll('.glossary-del').forEach(btn => btn.onclick = async e => {
+    e.stopPropagation();
+    const id = btn.dataset.id;
+    await state.sb.from('glossary').delete().eq('id', id).catch(()=>{});
+    state.glossary = state.glossary.filter(g => g.id !== id);
+    renderGlossaryTab();
+  });
+  // Click para ver término en el panel de explicación
+  b.querySelectorAll('.glossary-item').forEach(el => el.onclick = () => {
+    const g = state.glossary.find(x => x.id === el.dataset.id);
+    if (!g) return;
+    state.explainTerm = g.term; state.explainText = g.definition;
+    state.explainPage = g.page || state.pageNum; state.explainVisible = true; state.explainLoading = false;
+    state.explainLevel = g.level || 'intermedio';
+    renderExplainPanel();
+  });
 }
 
 // ---- Chat ----
@@ -840,7 +1215,6 @@ function renderChatTab(){
     </div>
   </div>`;
   document.getElementById('cm').scrollTop=999999;
-  // Wire up edit/delete action buttons
   document.getElementById('cm').querySelectorAll('.cm-act').forEach(btn => {
     btn.onclick = () => {
       const idx = parseInt(btn.dataset.idx);
@@ -859,8 +1233,7 @@ function renderChatTab(){
 }
 
 async function sendChat(text){
-  let promptText = text;
-  let uiText = text;
+  let promptText = text, uiText = text;
   if (state.chatCitation) {
     promptText = `[El usuario hace esta pregunta con respecto a la siguiente cita del documento: "${state.chatCitation}"]\n\nPregunta: ${text}`;
     uiText = `> "${state.chatCitation}"\n\n${text}`;
@@ -870,7 +1243,6 @@ async function sendChat(text){
   const reply=await askGemini(promptText);
   state.chatBusy=false;state.chatMessages.push({role:'model',text:reply});
   renderChatTab();
-
   const { data, error } = await state.sb.from('chat_messages').insert([
     {document_id:state.currentDoc.id,thread_id:state.currentThreadId,role:'user',content:uiText,user_id:state.session.user.id},
     {document_id:state.currentDoc.id,thread_id:state.currentThreadId,role:'model',content:reply,user_id:state.session.user.id},
@@ -882,44 +1254,27 @@ async function sendChat(text){
     state.chatMessages[state.chatMessages.length - 1].created_at = data[1].created_at;
     renderChatTab();
   }
-  if (error) {
-    console.error("Error saving chat:", error);
-    alert("Error al guardar mensajes de chat:\n" + error.message + "\n\nCódigo: " + error.code + "\nDetalles: " + error.details);
-  }
+  if (error) { console.error("Error saving chat:", error); alert("Error al guardar mensajes de chat:\n" + error.message); }
 }
 
-// ---- Eliminar mensaje ----
 async function deleteChatMessage(idx) {
   if (!confirm('¿Eliminar este mensaje?')) return;
   const msg = state.chatMessages[idx];
-  if (msg?.id) {
-    await state.sb.from('chat_messages').delete().eq('id', msg.id);
-  }
+  if (msg?.id) await state.sb.from('chat_messages').delete().eq('id', msg.id);
   state.chatMessages.splice(idx, 1);
   renderChatTab();
 }
 
-// ---- Editar mensaje (estilo ChatGPT): borra todo lo de después y pide nueva respuesta ----
 function startEditMessage(idx) {
   const msg = state.chatMessages[idx];
   if (!msg || msg.role !== 'user') return;
-
-  // Reemplazar la burbuja del mensaje con un textarea editable
   const wrap = document.querySelector(`.chat-msg-wrap[data-idx="${idx}"]`);
   if (!wrap) return;
-
-  // Detectar si el mensaje original tenía una cita
-  let citation = '';
-  let rawText = msg.text;
+  let citation = '', rawText = msg.text;
   if (msg.text.startsWith('> "')) {
-    // Formato: > "CITA"\n\nPREGUNTA
     const sepIdx = msg.text.indexOf('"\n\n');
-    if (sepIdx !== -1) {
-      citation = msg.text.slice(3, sepIdx);  // sin el > " del inicio
-      rawText = msg.text.slice(sepIdx + 3);
-    }
+    if (sepIdx !== -1) { citation = msg.text.slice(3, sepIdx); rawText = msg.text.slice(sepIdx + 3); }
   }
-
   wrap.innerHTML = `
     ${citation ? `<div class="chat-cite-block">"${esc(citation)}"</div>` : ''}
     <textarea class="chat-edit-area" id="edit-ta">${esc(rawText)}</textarea>
@@ -927,34 +1282,18 @@ function startEditMessage(idx) {
       <button class="chat-edit-save" id="edit-save">Guardar y reenviar</button>
       <button class="chat-edit-cancel" id="edit-cancel">Cancelar</button>
     </div>`;
-
   const ta = document.getElementById('edit-ta');
-  ta.focus();
-  ta.selectionStart = ta.selectionEnd = ta.value.length;
-
+  ta.focus(); ta.selectionStart = ta.selectionEnd = ta.value.length;
   document.getElementById('edit-cancel').onclick = () => renderChatTab();
-
   document.getElementById('edit-save').onclick = async () => {
-    const newText = ta.value.trim();
-    if (!newText) return;
-
-    // Recopilar IDs de mensajes que borraremos (el propio msg y todo lo posterior)
+    const newText = ta.value.trim(); if (!newText) return;
     const toDelete = state.chatMessages.slice(idx).map(m => m.id).filter(Boolean);
-    if (toDelete.length > 0) {
-      await state.sb.from('chat_messages').delete().in('id', toDelete);
-    }
-
-    // Truncar el historial local hasta antes de idx
+    if (toDelete.length > 0) await state.sb.from('chat_messages').delete().in('id', toDelete);
     state.chatMessages = state.chatMessages.slice(0, idx);
-
-    // Restaurar la cita si existía para que sendChat la incluya de nuevo
     if (citation) state.chatCitation = citation;
-
-    // Enviar el mensaje editado como si fuera nuevo
     sendChat(newText);
   };
 }
-
 
 async function askGemini(userText){
   const sys=`Eres un asistente de lectura dentro de Readily. El usuario lee "${state.currentDoc?.title||''}" (p.${state.pageNum}/${state.numPages}).
@@ -969,25 +1308,17 @@ Reglas:
 - Cita la página cuando sea relevante.
 - Si algo no está definido en el documento, explícalo brevemente con tu conocimiento.`;
 
-  // Copiar el historial para enviar a Gemini
   const history = state.chatMessages.slice(-MAX_CTX).map(m => ({
     role: m.role === 'user' ? 'user' : 'model',
     parts: [{ text: m.text }]
   }));
-
-  // Inyectar el texto enriquecido (con la cita oculta) al final del historial
   if (history.length > 0 && history[history.length - 1].role === 'user') {
     history[history.length - 1].parts[0].text = userText;
   }
-
   try{
     const r=await fetch(`${GEMINI_API}?key=${state.geminiKey}`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        systemInstruction:{parts:[{text:sys}]},
-        contents: history
-      })
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ systemInstruction:{parts:[{text:sys}]}, contents: history })
     });
     const d=await r.json();if(d.error)return`Error: ${d.error.message}`;
     return d.candidates?.[0]?.content?.parts?.map(p=>p.text).join('')||'Sin respuesta.';
@@ -995,7 +1326,7 @@ Reglas:
 }
 
 // ============================================================
-// Panel flotante de explicación — PERSISTE mientras lees
+// Panel flotante de explicación — con niveles
 // ============================================================
 function renderExplainPanel() {
   let panel = document.getElementById('explain-panel');
@@ -1006,6 +1337,7 @@ function renderExplainPanel() {
   }
   const term = state.explainTerm;
   const isLoading = state.explainLoading;
+  const lvl = state.explainLevel;
   panel.innerHTML = `
     <div class="explain-panel-header">
       <div>
@@ -1013,6 +1345,11 @@ function renderExplainPanel() {
         <div class="explain-panel-page">Página ${state.explainPage} · ${esc(state.currentDoc?.title || '')}</div>
       </div>
       <button class="explain-panel-close" id="ep-close">✕</button>
+    </div>
+    <div class="explain-levels-row">
+      <button class="explain-level-btn ${lvl==='simple'?'active':''}" id="ep-lvl-simple">🟢 Simple</button>
+      <button class="explain-level-btn ${lvl==='intermedio'?'active':''}" id="ep-lvl-intermedio">🔵 Intermedio</button>
+      <button class="explain-level-btn ${lvl==='tecnico'?'active':''}" id="ep-lvl-tecnico">🔴 Técnico</button>
     </div>
     <div class="explain-panel-body" id="ep-body">
       ${isLoading ? '<div class="explain-loading"><div class="spinner"></div><span>Pensando…</span></div>'
@@ -1025,6 +1362,16 @@ function renderExplainPanel() {
     </div>` : ''}`;
 
   document.getElementById('ep-close').onclick = () => { state.explainVisible = false; panel.remove(); };
+
+  const setLevel = async (newLvl) => {
+    if (state.explainLoading) return;
+    state.explainLevel = newLvl;
+    localStorage.setItem(EXPLAIN_LVL_LS, newLvl);
+    await triggerExplain(term, state.explainPage, newLvl);
+  };
+  document.getElementById('ep-lvl-simple').onclick = () => setLevel('simple');
+  document.getElementById('ep-lvl-intermedio').onclick = () => setLevel('intermedio');
+  document.getElementById('ep-lvl-tecnico').onclick = () => setLevel('tecnico');
 
   if (!isLoading && state.explainText) {
     document.getElementById('ep-chat').onclick = () => {
@@ -1053,15 +1400,16 @@ function renderExplainPanel() {
   }
 }
 
-async function triggerExplain(term, pageNum) {
+async function triggerExplain(term, pageNum, level) {
+  level = level || state.explainLevel;
   state.explainTerm = term;
   state.explainPage = pageNum;
   state.explainText = '';
   state.explainLoading = true;
   state.explainVisible = true;
+  state.explainLevel = level;
   renderExplainPanel();
 
-  // Contexto de la página
   const pd = state.searchIndex.find(p => p.page === pageNum);
   const pt = pd?.text || '';
   const tl = term.toLowerCase(), pl = pt.toLowerCase();
@@ -1070,18 +1418,26 @@ async function triggerExplain(term, pageNum) {
   if (ti !== -1) { const s = Math.max(0, ti - 300), e = Math.min(pt.length, ti + term.length + 400); ctx = pt.slice(s, e); }
   else ctx = pt.slice(0, 800);
 
-  const prompt = `Explica de forma didáctica, clara y súper breve (máximo 3-4 líneas en total) qué significa "${term}" en el contexto de la lectura "${state.currentDoc?.title || ''}".
+  const levelInstructions = {
+    simple: 'Explícalo como si se lo explicaras a un niño de 12 años. Usa palabras cotidianas, evita términos técnicos y da un ejemplo de la vida real.',
+    intermedio: 'Explícalo de forma clara y directa para alguien con conocimiento general. Puedes usar algunos términos del campo pero explícalos brevemente.',
+    tecnico: 'Explícalo con precisión técnica y rigor académico. Puedes usar terminología especializada y mencionar matices o sutilezas del concepto.'
+  };
+
+  const prompt = `Explica "${term}" en el contexto de la lectura "${state.currentDoc?.title || ''}".
+
+Nivel: ${levelInstructions[level] || levelInstructions.intermedio}
 
 Contexto de la página ${pageNum}:
 "${ctx}"
 
-Instrucciones:
-1. Sé extremadamente resumido. No escribas textos largos.
+Instrucciones adicionales:
+1. Sé muy conciso. Máximo 3-4 líneas en total.
 2. NO uses negrita (evita "**").
 3. Da una definición de 1 oración directa.
-4. Da un ejemplo de 1 oración o una analogía corta.
+4. Da un ejemplo de 1 oración o una analogía corta si aplica.
 
-Responde en español de forma muy fluida y directa. Sin títulos, sin números y sin formato JSON. Texto ultra-conciso.`;
+Responde en español de forma muy fluida y directa. Sin títulos, sin números y sin formato JSON.`;
 
   try {
     const r = await fetch(`${GEMINI_API}?key=${state.geminiKey}`, {
@@ -1096,6 +1452,23 @@ Responde en español de forma muy fluida y directa. Sin títulos, sin números y
   }
   state.explainLoading = false;
   if (state.explainVisible) renderExplainPanel();
+
+  // Guardar en glosario automáticamente
+  if (state.explainText && !state.explainText.startsWith('⚠️') && state.currentDoc) {
+    const alreadyExists = state.glossary.some(g => g.term.toLowerCase() === term.toLowerCase() && g.level === level);
+    if (!alreadyExists) {
+      try {
+        const { data: gData } = await state.sb.from('glossary').insert({
+          document_id: state.currentDoc.id,
+          user_id: state.session.user.id,
+          term, definition: state.explainText,
+          level, page: pageNum
+        }).select().single();
+        if (gData) state.glossary.unshift(gData);
+        if (state.sidebarTab === 'glossary') renderGlossaryTab();
+      } catch(_) { /* glossary table may not exist yet */ }
+    }
+  }
 }
 
 function explainSelection() {
@@ -1103,11 +1476,7 @@ function explainSelection() {
   const { text, pageNum } = pendingSelection;
   hideSelectionToolbar();
   window.getSelection().removeAllRanges();
-  if (!state.geminiKey) {
-    state.sidebarTab = 'chat';
-    toggleSidebar(true);
-    renderSidebar(); return;
-  }
+  if (!state.geminiKey) { state.sidebarTab = 'chat'; toggleSidebar(true); renderSidebar(); return; }
   triggerExplain(text, pageNum);
 }
 
@@ -1116,10 +1485,7 @@ function askAboutSelection() {
   const { text } = pendingSelection;
   hideSelectionToolbar();
   window.getSelection().removeAllRanges();
-
-  // Quitar popup anterior si existe
   document.getElementById('ask-popup')?.remove();
-
   const popup = document.createElement('div');
   popup.id = 'ask-popup';
   popup.className = 'ask-popup';
@@ -1134,15 +1500,11 @@ function askAboutSelection() {
       <button class="ask-popup-send" id="ask-popup-send" title="Enviar">↑</button>
     </div>`;
   document.body.appendChild(popup);
-
   const inp = document.getElementById('ask-popup-input');
   inp.focus();
-
   document.getElementById('ask-popup-close').onclick = () => popup.remove();
-
   const doSend = () => {
-    const q = inp.value.trim();
-    if (!q) return;
+    const q = inp.value.trim(); if (!q) return;
     popup.remove();
     state.sidebarTab = 'chat';
     state.chatCitation = text;
@@ -1150,11 +1512,148 @@ function askAboutSelection() {
     renderSidebar();
     sendChat(q);
   };
-
   document.getElementById('ask-popup-send').onclick = doSend;
-  inp.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); }
-  });
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); } });
+}
+
+// ============================================================
+// Quiz de comprobación
+// ============================================================
+async function generateQuizQuestion(recentPages) {
+  if (!state.geminiKey) return null;
+  const pagesCtx = state.searchIndex
+    .filter(p => recentPages.includes(p.page))
+    .map(p => `[Pág. ${p.page}] ${p.text.slice(0, 600)}`)
+    .join('\n\n');
+  const prompt = `El usuario acaba de leer las páginas ${recentPages.join(', ')} de "${state.currentDoc?.title || ''}".
+
+Contenido de esas páginas:
+${pagesCtx}
+
+Genera UNA sola pregunta de comprensión lectora que invite a reflexionar sobre lo leído. La pregunta debe ser:
+- Abierta (no de opción múltiple)
+- Que conecte conceptos del texto
+- Que no se pueda responder con una sola palabra
+
+Responde SOLO con la pregunta, sin numeración ni explicación.`;
+  try {
+    const r = await fetch(`${GEMINI_API}?key=${state.geminiKey}`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ contents: [{ role:'user', parts:[{ text: prompt }] }] })
+    });
+    const d = await r.json();
+    return d.candidates?.[0]?.content?.parts?.map(p => p.text).join('').trim() || null;
+  } catch(_) { return null; }
+}
+
+async function showQuizPopup(question, recentPages) {
+  document.getElementById('quiz-popup')?.remove();
+  const popup = document.createElement('div');
+  popup.id = 'quiz-popup'; popup.className = 'quiz-popup';
+  popup.innerHTML = `
+    <div class="quiz-popup-header">
+      <div class="quiz-popup-tag">🧠 Pausa de comprensión · Págs. ${recentPages[0]}–${recentPages[recentPages.length-1]}</div>
+      <div class="quiz-popup-q">${esc(question)}</div>
+    </div>
+    <div class="quiz-popup-body">
+      <textarea class="quiz-textarea" id="quiz-answer" placeholder="Escribe tu respuesta aquí…"></textarea>
+    </div>
+    <div class="quiz-popup-actions">
+      <button class="quiz-skip-btn" id="quiz-skip">Saltar</button>
+      <button class="quiz-submit-btn" id="quiz-submit">Verificar →</button>
+    </div>`;
+  document.body.appendChild(popup);
+  document.getElementById('quiz-skip').onclick = () => popup.remove();
+  document.getElementById('quiz-submit').onclick = async () => {
+    const answer = document.getElementById('quiz-answer')?.value.trim();
+    if (!answer) return;
+    const submitBtn = document.getElementById('quiz-submit');
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Evaluando…'; }
+    const pagesCtx = state.searchIndex.filter(p => recentPages.includes(p.page)).map(p => p.text.slice(0,400)).join(' ');
+    const feedPrompt = `Pregunta: "${question}"\nRespuesta del usuario: "${answer}"\nContexto del libro: "${pagesCtx}"\n\nDa retroalimentación breve (2-3 oraciones) en español: qué estuvo bien, qué podría añadir. Sé alentador. Sin negrita.`;
+    let feedback = '';
+    try {
+      const r = await fetch(`${GEMINI_API}?key=${state.geminiKey}`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ contents: [{ role:'user', parts:[{ text: feedPrompt }] }] })
+      });
+      const d = await r.json();
+      feedback = d.candidates?.[0]?.content?.parts?.map(p => p.text).join('').trim() || '¡Buen intento!';
+    } catch(_) { feedback = '¡Buen intento! Sigue leyendo.'; }
+    const popupEl = document.getElementById('quiz-popup');
+    if (popupEl) {
+      popupEl.innerHTML += `<div class="quiz-feedback">${esc(feedback)}</div><button class="quiz-close-btn" id="quiz-close">Continuar leyendo →</button>`;
+      document.getElementById('quiz-close').onclick = () => popupEl.remove();
+      popupEl.querySelector('.quiz-popup-actions')?.remove();
+      popupEl.querySelector('.quiz-popup-body')?.remove();
+    }
+  };
+}
+
+// ============================================================
+// Chapter preview / mapa de capítulo
+// ============================================================
+function findChapterAtPage(page) {
+  if (!state.tocEntries || !state.tocEntries.length) return null;
+  // Simple heuristic: look for TOC entry with title only (no page resolution needed here)
+  return state.tocEntries[0]?.title || null;
+}
+
+async function maybeShowChapterPreview(page) {
+  if (!state.geminiKey || !state.tocEntries.length) return;
+  document.getElementById('chapter-preview')?.remove();
+  // Detectar si la página actual inicia un capítulo del TOC (heurística simple)
+  const pageData = state.searchIndex.find(p => p.page === page);
+  if (!pageData) return;
+  const text = pageData.text;
+  const wordCount = text.split(/\s+/).length;
+  // Si la página tiene muy poco texto, probablemente es portada de capítulo
+  if (wordCount > 80) return;
+
+  const nextCtx = state.searchIndex.filter(p => p.page >= page && p.page <= page + 3).map(p => p.text.slice(0, 400)).join('\n');
+  const prompt = `El usuario está a punto de empezar una nueva sección del libro "${state.currentDoc?.title || ''}" en la página ${page}.
+
+Texto de las siguientes páginas:
+${nextCtx}
+
+En 3-4 líneas muy breves y motivadoras, dile al usuario de qué trata esta sección y por qué es importante o interesante. Como si le dijeras "esto que vas a leer es relevante porque…". 
+Sin títulos, sin bullets. Solo un párrafo fluido en español.`;
+
+  try {
+    const r = await fetch(`${GEMINI_API}?key=${state.geminiKey}`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ contents: [{ role:'user', parts:[{ text: prompt }] }] })
+    });
+    const d = await r.json();
+    const preview = d.candidates?.[0]?.content?.parts?.map(p => p.text).join('').trim() || null;
+    if (!preview) return;
+
+    const el = document.createElement('div');
+    el.id = 'chapter-preview'; el.className = 'chapter-preview';
+    el.innerHTML = `
+      <div class="chapter-preview-header">
+        <div class="chapter-preview-title">📖 Antes de leer esta sección…</div>
+        <button class="chapter-preview-close" id="cp-close">✕</button>
+      </div>
+      <div class="chapter-preview-body">
+        <div style="font-size:13px;line-height:1.65;color:var(--ink)">${esc(preview)}</div>
+      </div>`;
+    document.body.appendChild(el);
+    document.getElementById('cp-close').onclick = () => el.remove();
+    setTimeout(() => el.remove(), 12000);
+  } catch(_) {}
+}
+
+// ============================================================
+// Toast de logro
+// ============================================================
+function showToast(emoji, message) {
+  document.getElementById('achievement-toast')?.remove();
+  const t = document.createElement('div');
+  t.id = 'achievement-toast'; t.className = 'achievement-toast';
+  t.innerHTML = `<span class="toast-emoji">${emoji}</span>${esc(message)}`;
+  document.body.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .4s'; setTimeout(() => t.remove(), 400); }, 3500);
 }
 
 // ============================================================
@@ -1163,10 +1662,34 @@ function askAboutSelection() {
 function setSaving(v) { state.saving = v; const d = document.querySelector('.sync-dot'); if (d) { d.classList.toggle('saving', v); d.title = v ? 'Guardando…' : 'Guardado'; } }
 
 async function goToPage(n) {
-  n = Math.max(1, Math.min(state.numPages, n)); state.pageNum = n; renderToolbar(); renderPage(n);
+  n = Math.max(1, Math.min(state.numPages, n));
+  const prevPage = state.pageNum;
+  state.pageNum = n;
+  renderToolbar(); renderPage(n);
   setSaving(true);
-  await state.sb.from('reading_progress').upsert({ document_id: state.currentDoc.id, page: n, updated_at: new Date().toISOString() }, { onConflict: 'document_id,user_id' });
+  await state.sb.from('reading_progress').upsert({ document_id: state.currentDoc.id, page: n, updated_at: new Date().toISOString(), user_id: state.session.user.id }, { onConflict: 'document_id,user_id' });
   setSaving(false);
+
+  // Quiz trigger: cada QUIZ_EVERY_N páginas avanzadas
+  if (n > prevPage && state.geminiKey) {
+    if (n - state.quizLastPage >= QUIZ_EVERY_N) {
+      const recentPages = [];
+      for (let p = state.quizLastPage + 1; p <= n; p++) recentPages.push(p);
+      state.quizLastPage = n;
+      const question = await generateQuizQuestion(recentPages.slice(-QUIZ_EVERY_N));
+      if (question) showQuizPopup(question, recentPages.slice(-QUIZ_EVERY_N));
+    }
+  }
+
+  // Chapter preview (solo cuando avanzamos)
+  if (n > prevPage && n !== prevPage + 1) {
+    maybeShowChapterPreview(n);
+  }
+
+  // Toast de capítulo completado (heurística: página con poco texto entre dos páginas normales)
+  if (n > 1 && n % 10 === 0) {
+    showToast('✅', `¡Página ${n} completada!`);
+  }
 }
 
 async function renderPage(num) {
@@ -1232,10 +1755,8 @@ function onSelectionEnd(pageNum) {
   if (!sel || sel.isCollapsed || !sel.rangeCount) { hideSelectionToolbar(); return; }
   let text = sel.toString().trim();
   if (!text) { hideSelectionToolbar(); return; }
-  // Limpiar texto seleccionado
   text = cleanSelectedText(text, pageNum);
   if (!text || text.length < 2) { hideSelectionToolbar(); return; }
-
   const range = sel.getRangeAt(0);
   const td = document.getElementById('text-layer');
   if (!td?.contains(range.commonAncestorContainer)) { hideSelectionToolbar(); return; }
