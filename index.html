@@ -464,6 +464,17 @@ const GEMINI_API     = 'https://generativelanguage.googleapis.com/v1beta/models/
 const MAX_CTX        = 30;
 const QUIZ_EVERY_N   = 5; // páginas entre quizzes
 
+// Bloque de estilo de explicación — se inyecta en todos los prompts de IA
+const STYLE_BLOCK = `Al explicar, sigue estas reglas de estilo:
+
+1. Ve directo a la base lógica: qué es lo mínimo que hace que esto tenga sentido, antes que la descripción general.
+2. Evita metáforas espaciales o decorativas ("como un puente entre...", "imagina un mundo donde..."). Si necesitas comparar algo, usa una acción o consecuencia concreta, no una imagen visual/espacial.
+3. Si hay una relación de causa-efecto, exprésala explícita: "si pasa X, entonces Y". No la dejes implícita.
+4. No agregues definiciones o datos adicionales "por si acaso" que no sean necesarios para responder lo pedido. Menos es mejor que exhaustivo.
+5. Si el tema tiene una lógica fija/determinista (matemática, física, regla química fija), puedes cerrar con una versión comprimida tipo fórmula o regla corta.
+6. Si el tema requiere interpretación, análisis, o tiene varias causas válidas a la vez (no una sola regla), dilo explícitamente: aclara que aquí no hay un único camino, y presenta las alternativas en tensión en vez de simplificar de más.
+7. Nunca uses negrita ("**").`;
+
 const CATEGORIES = ['Sin categoría','Ciencia','Tecnología','Historia','Literatura','Filosofía','Arte','Economía','Medicina','Matemáticas','Derecho','Otro'];
 
 const state = {
@@ -983,8 +994,9 @@ async function showResumeBanner(doc, page) {
 Aquí está el texto de las últimas páginas leídas:
 ${pagesCtx}
 
-En 2-3 líneas muy breves y fluidas, recuérdale al usuario de qué estaba hablando el libro en esas páginas para que pueda retomar el hilo sin releer. 
-Responde en español, sin títulos ni bullets. Solo un párrafo de 2-3 oraciones cortas y directas.`;
+${STYLE_BLOCK}
+
+En 2-3 líneas, recuérdale de qué trataba el libro en esas páginas, priorizando la idea que conecta lo leído (la causa o el hilo lógico), no solo un resumen de eventos. Responde en español, sin títulos ni bullets, un párrafo directo.`;
 
   try {
     const r = await fetch(`${GEMINI_API}?key=${state.geminiKey}`, {
@@ -1425,12 +1437,16 @@ async function askGemini(userText){
 Texto del documento:
 ${state.docFullText}
 
-Reglas:
-- Responde en español de forma extremadamente clara, breve y concisa.
-- No uses respuestas abrumadoramente largas ni listas de viñetas interminables.
-- EVITA EL USO DE TEXTO EN NEGRITA (no utilices "**" para resaltar palabras bajo ningún concepto).
+${STYLE_BLOCK}
+
+Reglas adicionales de conversación:
+- Si el usuario pide explicar algo complejo (un concepto con varias partes), no lo expliques completo de una vez. Divide en una pieza pequeña, pregunta si se entendió antes de seguir con la siguiente.
+- Si el usuario reformula algo con sus propias palabras y está bien, confírmalo con sus propias palabras, no con las tuyas.
+- Si el usuario se equivoca en una pieza, corrige directo y breve, sin suavizar con rodeos, y continúa.
+- Cuando termines de explicar un concepto completo, cierra con una versión comprimida (pseudocódigo, fórmula, o regla corta) SOLO si el tema tiene lógica determinista. Si el tema es interpretativo, cierra señalando cuáles son los caminos o posturas en tensión.
+- Responde en español, extremadamente claro, breve, sin listas de viñetas interminables.
 - Cita la página cuando sea relevante.
-- Si algo no está definido en el documento, explícalo brevemente con tu conocimiento.`;
+- Si algo no está en el documento, explícalo brevemente con tu conocimiento general.`;
 
   const history = state.chatMessages.slice(-MAX_CTX).map(m => ({
     role: m.role === 'user' ? 'user' : 'model',
@@ -1582,13 +1598,13 @@ Nivel: ${levelInstructions[level] || levelInstructions.intermedio}
 Contexto de la página ${pageNum}:
 "${ctx}"
 
-Instrucciones adicionales:
-1. Sé muy conciso. Máximo 3-4 líneas en total.
-2. NO uses negrita (evita "**").
-3. Da una definición de 1 oración directa.
-4. Da un ejemplo de 1 oración o una analogía corta si aplica.
+${STYLE_BLOCK}
 
-Responde en español de forma muy fluida y directa. Sin títulos, sin números y sin formato JSON.`;
+Instrucciones adicionales:
+1. Máximo 3-4 líneas en total.
+2. Da la base o regla que hace que el término tenga sentido en 1 oración (no una definición de diccionario suelta).
+3. Si aplica, da la consecuencia directa de esa base en 1 oración (qué provoca, qué explica, qué predice) — evita comparaciones espaciales o visuales decorativas.
+4. Sin títulos, sin números, sin formato JSON. Responde en español, fluido y directo.`;
 
   try {
     const r = await fetch(`${GEMINI_API}?key=${state.geminiKey}`, {
@@ -1701,10 +1717,7 @@ async function generateQuizQuestion(recentPages) {
 Contenido de esas páginas:
 ${pagesCtx}${crossRefInstruction}
 
-Genera UNA sola pregunta de comprensión lectora que invite a reflexionar sobre lo leído. La pregunta debe ser:
-- Abierta (no de opción múltiple)
-- Que conecte conceptos del texto
-- Que no se pueda responder con una sola palabra
+Genera UNA sola pregunta de comprensión que invite a conectar causa y efecto, o base y consecuencia, dentro de lo leído — no una pregunta de solo recordar un dato. Debe ser abierta, no de opción múltiple, y no responderse con una sola palabra.
 
 Responde SOLO con la pregunta, sin numeración ni explicación.`;
   try {
@@ -1741,7 +1754,7 @@ async function showQuizPopup(question, recentPages) {
     const submitBtn = document.getElementById('quiz-submit');
     if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Evaluando…'; }
     const pagesCtx = state.searchIndex.filter(p => recentPages.includes(p.page)).map(p => p.text.slice(0,400)).join(' ');
-    const feedPrompt = `Pregunta: "${question}"\nRespuesta del usuario: "${answer}"\nContexto del libro: "${pagesCtx}"\n\nDa retroalimentación breve (2-3 oraciones) en español: qué estuvo bien, qué podría añadir. Sé alentador. Sin negrita.`;
+    const feedPrompt = `Pregunta: "${question}"\nRespuesta del usuario: "${answer}"\nContexto del libro: "${pagesCtx}"\n\n${STYLE_BLOCK}\n\nDa retroalimentación breve (2-3 oraciones): confirma qué parte de la lógica captó bien (usando, si puedes, algo cercano a sus propias palabras), y si falta algo, señala directamente qué causa o conexión no completó — sin rodeos, sin colchón excesivo de cortesía. Sin negrita. Responde en español.`;
     let feedback = '';
     try {
       const r = await fetch(`${GEMINI_API}?key=${state.geminiKey}`, {
@@ -1787,8 +1800,9 @@ async function maybeShowChapterPreview(page) {
 Texto de las siguientes páginas:
 ${nextCtx}
 
-En 3-4 líneas muy breves y motivadoras, dile al usuario de qué trata esta sección y por qué es importante o interesante. Como si le dijeras "esto que vas a leer es relevante porque…". 
-Sin títulos, sin bullets. Solo un párrafo fluido en español.`;
+${STYLE_BLOCK}
+
+En 3-4 líneas, anticipa la idea base de esta sección y qué consecuencia o pregunta abre (no solo "de qué trata"). Sin títulos, sin bullets, un párrafo fluido en español.`;
 
   try {
     const r = await fetch(`${GEMINI_API}?key=${state.geminiKey}`, {
@@ -2045,12 +2059,14 @@ async function captureAndExplainRegion(x, y, w, h, overlayRect) {
   // Llamar a Gemini Vision con imagen + texto
   const prompt = `Estás analizando un elemento visual (diagrama, fórmula, imagen, esquema, tabla o gráfico) extraído de la página ${state.pageNum} del documento "${state.currentDoc?.title || ''}".
 
-Describe e interpreta este elemento visual de forma clara y concisa:
-1. ¿Qué tipo de elemento es? (diagrama, fórmula, tabla, gráfico, imagen, esquema…)
-2. ¿Qué representa o qué información transmite?
-3. ¿Cuál es su relación con el tema del documento?
+${STYLE_BLOCK}
 
-Sé breve (máximo 4-5 líneas). Responde en español, sin negrita, sin bullet points.`;
+Describe e interpreta este elemento:
+1. Qué tipo de elemento es.
+2. Qué relación de causa-efecto o de base-regla-resultado representa (no solo qué "muestra" visualmente).
+3. Cómo se conecta con el tema general del documento.
+
+Máximo 4-5 líneas. Español, sin negrita, sin bullets.`;
 
   try {
     const r = await fetch(`${GEMINI_API}?key=${state.geminiKey}`, {
