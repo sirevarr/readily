@@ -1470,7 +1470,15 @@ function renderFlashcardsTab() {
   document.getElementById('fc-new-open').onclick = () => showNewCardForm(b, header);
   
   const fs = document.getElementById('fc-search');
-  if (fs) fs.oninput = e => { state.fcFilter = e.target.value; renderFlashcardsTab(); };
+  if (fs) fs.oninput = e => {
+    const val = e.target.value;
+    const cursorPos = e.target.selectionStart;
+    state.fcFilter = val;
+    renderFlashcardsTab();
+    // Restaurar foco y posición del cursor después del re-render
+    const newFs = document.getElementById('fc-search');
+    if (newFs) { newFs.focus(); newFs.setSelectionRange(cursorPos, cursorPos); }
+  };
 
   // Voltear tarjeta individual al hacer click
   b.querySelectorAll('.fc-card').forEach(card => {
@@ -2637,8 +2645,17 @@ function hideChatSelectionToolbar() {
   if (bar) bar.style.display = 'none';
 }
 
-document.addEventListener('mouseup', handleChatSelection);
-document.addEventListener('touchend', () => setTimeout(handleChatSelection, 100));
+document.addEventListener('mouseup', (e) => {
+  // No procesar si el click fue dentro del propio toolbar (evita destruir el handler antes del click)
+  const chatBar = document.getElementById('chat-sel-tb');
+  if (chatBar && chatBar.contains(e.target)) return;
+  handleChatSelection();
+});
+document.addEventListener('touchend', (e) => {
+  const chatBar = document.getElementById('chat-sel-tb');
+  if (chatBar && chatBar.contains(e.target)) return;
+  setTimeout(handleChatSelection, 100);
+});
 
 // ============================================================
 // Boot
