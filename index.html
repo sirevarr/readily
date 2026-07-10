@@ -1817,14 +1817,13 @@ ${state.docFullText}
 ${STYLE_BLOCK}
 
 Reglas adicionales de conversación:
-- Responde con la extensión que el tema necesita: ni más larga de lo necesario, ni tan corta que quede incompleta.
-- Si el usuario conversa de forma informal o hace una pregunta simple, responde de forma natural y cómoda, sin estructura rígida.
+- Si el usuario pide explicar algo complejo (un concepto con varias partes), no lo expliques completo de una vez. Divide en una pieza pequeña, pregunta si se entendió antes de seguir con la siguiente.
 - Si el usuario reformula algo con sus propias palabras y está bien, confírmalo con sus propias palabras, no con las tuyas.
-- Si el usuario se equivoca, corrige directo y claro, sin rodeos, y continúa.
-- Cuando termines de explicar un concepto, cierra con una versión comprimida (fórmula, regla corta) SOLO si el tema tiene lógica determinista. Si el tema es interpretativo, señala brevemente los caminos o posturas en tensión.
+- Si el usuario se equivoca en una pieza, corrige directo y breve, sin suavizar con rodeos, y continúa.
+- Cuando termines de explicar un concepto completo, cierra con una versión comprimida (pseudocódigo, fórmula, o regla corta) SOLO si el tema tiene lógica determinista. Si el tema es interpretativo, cierra señalando cuáles son los caminos o posturas en tensión.
+- Responde en español, extremadamente claro, breve, sin listas de viñetas interminables.
 - Cita la página cuando sea relevante.
-- Si algo no está en el documento, explícalo con tu conocimiento general.
-- Responde siempre en español.`;
+- Si algo no está en el documento, explícalo brevemente con tu conocimiento general.`;
 
   const history = state.chatMessages.slice(-MAX_CTX).map(m => ({
     role: m.role === 'user' ? 'user' : 'model',
