@@ -437,6 +437,44 @@
     @media(max-width:640px){.sidebar-handle{display:block}}
     .sidebar-close-btn{display:none;margin-left:auto;background:none;border:none;color:var(--ink-soft);font-size:18px;padding:8px 10px;cursor:pointer;flex-shrink:0}
     @media(max-width:640px){.sidebar-close-btn{display:block}}
+
+    /* ---- Glosario → Tarjeta ---- */
+    .glossary-add-card{background:none;border:1px solid var(--line);color:var(--ink-soft);font-size:11px;padding:3px 8px;border-radius:6px;cursor:pointer;transition:all .12s;font-family:var(--sans)}
+    .glossary-add-card:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+    .glossary-add-card:disabled{opacity:.5;cursor:default}
+
+    /* ---- Flashcard header / form / rename ---- */
+    .fc-tab-header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 4px;border-bottom:1px solid var(--line);margin-bottom:12px}
+    .fc-tab-title{font-size:13px;font-weight:600;color:var(--ink)}
+    .fc-new-btn{background:var(--accent);color:#fff;border:none;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;transition:background .15s}
+    .fc-new-btn:hover{background:var(--accent-h)}
+    .fc-new-form{padding:16px;display:flex;flex-direction:column;gap:10px}
+    .fc-new-form label{font-size:11.5px;font-weight:500;color:var(--ink-soft);margin-bottom:2px;display:block}
+    .fc-new-form input,.fc-new-form textarea{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:var(--r);font-size:13px;font-family:var(--sans);outline:none;resize:vertical;transition:border-color .15s}
+    .fc-new-form input:focus,.fc-new-form textarea:focus{border-color:var(--accent)}
+    .fc-new-form-actions{display:flex;gap:8px;margin-top:4px}
+    .fc-new-save{background:var(--accent);color:#fff;border:none;padding:9px 18px;border-radius:var(--r);font-size:13px;font-weight:500;cursor:pointer;flex:1;transition:background .15s}
+    .fc-new-save:hover{background:var(--accent-h)}
+    .fc-new-cancel{background:none;border:1px solid var(--line);color:var(--ink-soft);padding:9px 14px;border-radius:var(--r);font-size:13px;cursor:pointer;transition:all .12s}
+    .fc-new-cancel:hover{border-color:var(--danger);color:var(--danger)}
+    .fc-card-actions{display:flex;gap:8px;justify-content:center;margin-top:4px}
+    .fc-rename-btn{background:none;border:1px solid var(--line);color:var(--ink-soft);font-size:11.5px;padding:5px 12px;border-radius:7px;cursor:pointer;transition:all .12s;font-family:var(--sans)}
+    .fc-rename-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+    .fc-rename-wrap{padding:14px 16px;display:flex;gap:8px;align-items:flex-end}
+    .fc-rename-input{flex:1;padding:9px 12px;border:1px solid var(--accent);border-radius:var(--r);font-size:13px;font-family:var(--sans);outline:none}
+    .fc-rename-save{background:var(--accent);color:#fff;border:none;padding:9px 16px;border-radius:var(--r);font-size:13px;cursor:pointer;white-space:nowrap}
+    .fc-rename-cancel{background:none;border:1px solid var(--line);color:var(--ink-soft);padding:9px 12px;border-radius:var(--r);font-size:13px;cursor:pointer}
+
+    /* ---- Chat: Explicar / Preguntar en respuestas IA ---- */
+    .cm-act.explain{color:var(--accent)}
+    .cm-act.explain:hover{background:var(--accent-soft);color:var(--accent)}
+    .cm-act.ask-about{color:#7CB2D9}
+    .cm-act.ask-about:hover{background:rgba(124,178,217,.12);color:#5a9ec4}
+
+    /* ---- Cita clickeable ---- */
+    .chat-cite-block{cursor:pointer;transition:background .15s}
+    .chat-cite-block:hover{background:rgba(63,110,99,.12);border-color:var(--accent)}
+    .chat-cite-block::after{content:' ↗';font-size:10px;opacity:.6;margin-left:4px}
   </style>
 </head>
 <body>
@@ -494,7 +532,7 @@ const state = {
   flashcards:[], flashcardIdx:0,
   chatCitation:'',
   explainTerm:'', explainText:'', explainPage:0, explainVisible:false, explainLoading:false,
-  explainLevel: localStorage.getItem(EXPLAIN_LVL_LS) || 'intermedio',
+  explainLevel: localStorage.getItem(EXPLAIN_LVL_LS) || 'simple',
   explainIsVisual: false, // flag para saber si la explicación es de un elemento visual
   glossary:[],
   glossaryFilter:'',
@@ -1235,10 +1273,22 @@ function renderTocTab() {
 // ---- Flashcards ----
 function renderFlashcardsTab() {
   const b = document.getElementById('sb-body'); if (!b) return;
-  if (!state.flashcards.length) { b.innerHTML = '<div class="empty-sidebar">Selecciona texto → ✨ Explicar → 💾 Guardar tarjeta para crear tus primeras tarjetas.</div>'; return; }
+
+  // Header siempre visible con botón ＋ Nueva tarjeta
+  const header = `<div class="fc-tab-header">
+    <span class="fc-tab-title">Tarjetas (${state.flashcards.length})</span>
+    <button class="fc-new-btn" id="fc-new-open">＋ Nueva tarjeta</button>
+  </div>`;
+
+  if (!state.flashcards.length) {
+    b.innerHTML = header + '<div class="empty-sidebar" style="margin-top:12px">Selecciona texto → ✨ Explicar → 💾 Guardar tarjeta, o usa el botón de arriba para crear una.</div>';
+    document.getElementById('fc-new-open').onclick = () => showNewCardForm(b, header);
+    return;
+  }
+
   const idx = Math.min(state.flashcardIdx, state.flashcards.length - 1);
   const fc = state.flashcards[idx];
-  b.innerHTML = `
+  b.innerHTML = header + `
     <div class="fc-container">
       <div class="fc-nav">
         <button class="fc-nav-btn" id="fc-p">‹</button>
@@ -1251,8 +1301,13 @@ function renderFlashcardsTab() {
           <div class="fc-back"><div class="fc-back-text">${esc(fc.back)}</div></div>
         </div>
       </div>
-      <button class="fc-delete-btn" id="fc-del">🗑 Eliminar tarjeta</button>
+      <div class="fc-card-actions">
+        <button class="fc-rename-btn" id="fc-rename">✏️ Renombrar</button>
+        <button class="fc-delete-btn" id="fc-del">🗑 Eliminar</button>
+      </div>
     </div>`;
+
+  document.getElementById('fc-new-open').onclick = () => showNewCardForm(b, header);
   document.getElementById('fc-card').onclick = () => document.getElementById('fc-card').classList.toggle('flipped');
   document.getElementById('fc-p').onclick = () => { state.flashcardIdx = Math.max(0, idx - 1); renderFlashcardsTab(); };
   document.getElementById('fc-n').onclick = () => { state.flashcardIdx = Math.min(state.flashcards.length - 1, idx + 1); renderFlashcardsTab(); };
@@ -1262,6 +1317,61 @@ function renderFlashcardsTab() {
     state.flashcards.splice(idx, 1);
     state.flashcardIdx = Math.min(idx, state.flashcards.length - 1);
     renderSidebar();
+  };
+  document.getElementById('fc-rename').onclick = () => {
+    b.innerHTML = header + `<div class="fc-rename-wrap">
+      <div style="flex:1">
+        <label style="font-size:11.5px;font-weight:500;color:var(--ink-soft);display:block;margin-bottom:4px">Nuevo título del frente:</label>
+        <input class="fc-rename-input" id="fc-rename-input" value="${esc(fc.front)}">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;padding:0 16px 16px">
+      <button class="fc-rename-save" id="fc-rename-save">Guardar</button>
+      <button class="fc-rename-cancel" id="fc-rename-cancel">Cancelar</button>
+    </div>`;
+    document.getElementById('fc-new-open').onclick = () => renderFlashcardsTab();
+    const inp = document.getElementById('fc-rename-input');
+    inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length;
+    document.getElementById('fc-rename-cancel').onclick = () => renderFlashcardsTab();
+    document.getElementById('fc-rename-save').onclick = async () => {
+      const newFront = inp.value.trim(); if (!newFront) return;
+      await state.sb.from('flashcards').update({ front: newFront }).eq('id', fc.id);
+      fc.front = newFront;
+      renderFlashcardsTab();
+    };
+  };
+}
+
+function showNewCardForm(b, header) {
+  b.innerHTML = header + `<div class="fc-new-form">
+    <div><label>Término (frente de la tarjeta)</label><input id="fc-nf-front" placeholder="Ej: Fotosíntesis"></div>
+    <div><label>Explicación (reverso de la tarjeta)</label><textarea id="fc-nf-back" rows="5" placeholder="Ej: Proceso por el cual las plantas convierten luz solar en energía…"></textarea></div>
+    <div class="fc-new-form-actions">
+      <button class="fc-new-save" id="fc-nf-save">Guardar tarjeta</button>
+      <button class="fc-new-cancel" id="fc-nf-cancel">Cancelar</button>
+    </div>
+  </div>`;
+  document.getElementById('fc-new-open').onclick = () => renderFlashcardsTab();
+  document.getElementById('fc-nf-cancel').onclick = () => renderFlashcardsTab();
+  document.getElementById('fc-nf-save').onclick = async () => {
+    const front = document.getElementById('fc-nf-front').value.trim();
+    const back = document.getElementById('fc-nf-back').value.trim();
+    if (!front || !back) { alert('Completa el término y la explicación.'); return; }
+    const btn = document.getElementById('fc-nf-save');
+    btn.disabled = true; btn.textContent = 'Guardando…';
+    try {
+      const { data, error } = await state.sb.from('flashcards').insert({
+        document_id: state.currentDoc.id, front, back, user_id: state.session.user.id
+      }).select().single();
+      if (error) throw error;
+      state.flashcards.push(data);
+      state.flashcardIdx = state.flashcards.length - 1;
+      renderFlashcardsTab();
+    } catch (err) {
+      btn.textContent = '⚠️ Error';
+      btn.disabled = false;
+      alert('No se pudo guardar.\n' + (err.message || err));
+    }
   };
 }
 
@@ -1280,31 +1390,67 @@ function renderGlossaryTab() {
       <div class="glossary-item" data-id="${g.id}">
         <div class="glossary-term">
           ${esc(g.term.length > 40 ? g.term.slice(0,40)+'…' : g.term)}
-          <span class="glossary-level-tag lvl-${g.level||'intermedio'}">${g.level||'intermedio'}</span>
+          <span class="glossary-level-tag lvl-${g.level||'simple'}">${g.level||'simple'}</span>
         </div>
         <div class="glossary-def">${esc(g.definition)}</div>
         ${g.page ? `<div class="glossary-page">Pág. ${g.page}</div>` : ''}
         <div class="glossary-actions">
+          <button class="glossary-add-card" data-id="${g.id}">→ Tarjeta</button>
           <button class="glossary-del" data-id="${g.id}">🗑 Eliminar</button>
         </div>
       </div>`).join('')}`;
+
   const gs = document.getElementById('gl-search');
   if (gs) gs.oninput = e => { state.glossaryFilter = e.target.value; renderGlossaryTab(); };
-  b.querySelectorAll('.glossary-del').forEach(btn => btn.onclick = async e => {
-    e.stopPropagation();
-    const id = btn.dataset.id;
-    await state.sb.from('glossary').delete().eq('id', id).catch(()=>{});
-    state.glossary = state.glossary.filter(g => g.id !== id);
-    renderGlossaryTab();
+
+  // Eliminar — listener directo sobre botón, stopPropagation antes del item
+  b.querySelectorAll('.glossary-del').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation();
+      e.preventDefault();
+      const id = btn.dataset.id;
+      btn.disabled = true;
+      await state.sb.from('glossary').delete().eq('id', id).catch(()=>{});
+      state.glossary = state.glossary.filter(g => g.id !== id);
+      renderGlossaryTab();
+    });
   });
-  // Click para ver término en el panel de explicación
-  b.querySelectorAll('.glossary-item').forEach(el => el.onclick = () => {
-    const g = state.glossary.find(x => x.id === el.dataset.id);
-    if (!g) return;
-    state.explainTerm = g.term; state.explainText = g.definition;
-    state.explainPage = g.page || state.pageNum; state.explainVisible = true; state.explainLoading = false;
-    state.explainLevel = g.level || 'intermedio';
-    renderExplainPanel();
+
+  // → Tarjeta
+  b.querySelectorAll('.glossary-add-card').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation();
+      e.preventDefault();
+      const id = btn.dataset.id;
+      const g = state.glossary.find(x => x.id === id);
+      if (!g) return;
+      btn.disabled = true; btn.textContent = 'Guardando…';
+      try {
+        const { data, error } = await state.sb.from('flashcards').insert({
+          document_id: state.currentDoc.id, front: g.term, back: g.definition, user_id: state.session.user.id
+        }).select().single();
+        if (error) throw error;
+        state.flashcards.push(data);
+        btn.textContent = '✅ Guardada';
+        setTimeout(() => { btn.textContent = '→ Tarjeta'; btn.disabled = false; }, 2000);
+      } catch (err) {
+        btn.textContent = '⚠️ Error'; btn.disabled = false;
+      }
+    });
+  });
+
+  // Click item → panel de explicación
+  b.querySelectorAll('.glossary-item').forEach(el => {
+    el.addEventListener('click', e => {
+      // Ignorar clicks en botones dentro del item
+      if (e.target.closest('button')) return;
+      const g = state.glossary.find(x => x.id === el.dataset.id);
+      if (!g) return;
+      state.explainTerm = g.term; state.explainText = g.definition;
+      state.explainPage = g.page || state.pageNum; state.explainVisible = true; state.explainLoading = false;
+      state.explainLevel = g.level || 'simple';
+      renderExplainPanel();
+    });
   });
 }
 
@@ -1315,7 +1461,7 @@ function parseChatMsg(text) {
     if (parts.length >= 2) {
       const cite = parts[0].substring(3);
       const q = parts.slice(1).join('"\n\n');
-      return `<div class="chat-cite-block">"${esc(cite)}"</div>${esc(q)}`;
+      return `<div class="chat-cite-block" data-cite="${esc(cite)}">"${esc(cite)}"</div>${esc(q)}`;
     }
   }
   return esc(text);
@@ -1340,9 +1486,10 @@ function renderChatTab(){
     <div class="chat-messages" id="cm">${mc===0?'<div class="chat-empty">Pregunta sobre el documento o selecciona texto y pulsa "✨ Explicar".</div>':''}${state.chatMessages.map((m,i)=>{
       const isUser = m.role==='user';
       const editBtn = isUser ? `<button class="cm-act" data-act="edit" data-idx="${i}">✏️ Editar</button>` : '';
+      const modelBtns = !isUser ? `<button class="cm-act explain" data-act="explain" data-idx="${i}">✨ Explicar</button><button class="cm-act ask-about" data-act="ask-about" data-idx="${i}">💬 Preguntar</button>` : '';
       return `<div class="chat-msg-wrap ${m.role}" data-idx="${i}">
         <div class="chat-msg">${parseChatMsg(m.text)}</div>
-        <div class="chat-msg-actions">${editBtn}<button class="cm-act del" data-act="del" data-idx="${i}">🗑 Eliminar</button></div>
+        <div class="chat-msg-actions">${editBtn}${modelBtns}<button class="cm-act del" data-act="del" data-idx="${i}">🗑 Eliminar</button></div>
       </div>`;
     }).join('')}${state.chatBusy?'<div class="chat-msg-wrap model"><div class="chat-msg pending">Pensando…</div></div>':''}</div>
     <div class="chat-input-row">
@@ -1351,11 +1498,32 @@ function renderChatTab(){
     </div>
   </div>`;
   document.getElementById('cm').scrollTop=999999;
+  // Citas clickeables → navegar a la página de origen
+  document.getElementById('cm').querySelectorAll('.chat-cite-block').forEach(el => {
+    el.onclick = () => {
+      const citeText = el.dataset.cite || '';
+      if (!citeText) return;
+      const match = state.searchIndex.find(p => p.text.toLowerCase().includes(citeText.toLowerCase().slice(0, 40)));
+      if (match) goToPage(match.page);
+    };
+  });
   document.getElementById('cm').querySelectorAll('.cm-act').forEach(btn => {
     btn.onclick = () => {
       const idx = parseInt(btn.dataset.idx);
       if (btn.dataset.act === 'del') deleteChatMessage(idx);
       else if (btn.dataset.act === 'edit') startEditMessage(idx);
+      else if (btn.dataset.act === 'explain') {
+        const msg = state.chatMessages[idx];
+        if (!msg) return;
+        if (!state.geminiKey) { state.sidebarTab = 'chat'; toggleSidebar(true); renderSidebar(); return; }
+        triggerExplain(msg.text.slice(0, 120), state.pageNum);
+      } else if (btn.dataset.act === 'ask-about') {
+        const msg = state.chatMessages[idx];
+        if (!msg) return;
+        state.chatCitation = msg.text.slice(0, 200);
+        renderChatTab();
+        setTimeout(() => document.getElementById('ci')?.focus(), 50);
+      }
     };
   });
   document.getElementById('th-sel').onchange=async e=>{state.currentThreadId=e.target.value;await loadThreadMsgs(state.currentThreadId);renderChatTab()};
@@ -1440,13 +1608,14 @@ ${state.docFullText}
 ${STYLE_BLOCK}
 
 Reglas adicionales de conversación:
-- Si el usuario pide explicar algo complejo (un concepto con varias partes), no lo expliques completo de una vez. Divide en una pieza pequeña, pregunta si se entendió antes de seguir con la siguiente.
+- Responde con la extensión que el tema necesita: ni más larga de lo necesario, ni tan corta que quede incompleta.
+- Si el usuario conversa de forma informal o hace una pregunta simple, responde de forma natural y cómoda, sin estructura rígida.
 - Si el usuario reformula algo con sus propias palabras y está bien, confírmalo con sus propias palabras, no con las tuyas.
-- Si el usuario se equivoca en una pieza, corrige directo y breve, sin suavizar con rodeos, y continúa.
-- Cuando termines de explicar un concepto completo, cierra con una versión comprimida (pseudocódigo, fórmula, o regla corta) SOLO si el tema tiene lógica determinista. Si el tema es interpretativo, cierra señalando cuáles son los caminos o posturas en tensión.
-- Responde en español, extremadamente claro, breve, sin listas de viñetas interminables.
+- Si el usuario se equivoca, corrige directo y claro, sin rodeos, y continúa.
+- Cuando termines de explicar un concepto, cierra con una versión comprimida (fórmula, regla corta) SOLO si el tema tiene lógica determinista. Si el tema es interpretativo, señala brevemente los caminos o posturas en tensión.
 - Cita la página cuando sea relevante.
-- Si algo no está en el documento, explícalo brevemente con tu conocimiento general.`;
+- Si algo no está en el documento, explícalo con tu conocimiento general.
+- Responde siempre en español.`;
 
   const history = state.chatMessages.slice(-MAX_CTX).map(m => ({
     role: m.role === 'user' ? 'user' : 'model',
