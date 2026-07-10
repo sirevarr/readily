@@ -475,6 +475,152 @@
     .chat-cite-block{cursor:pointer;transition:background .15s}
     .chat-cite-block:hover{background:rgba(63,110,99,.12);border-color:var(--accent)}
     .chat-cite-block::after{content:' ↗';font-size:10px;opacity:.6;margin-left:4px}
+    .chat-cite-block.expanded {
+      display: block !important;
+      max-height: none !important;
+      overflow: visible !important;
+      -webkit-line-clamp: unset !important;
+    }
+
+    /* ---- Lista de tarjetas cómoda ---- */
+    .fc-list-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 0 16px 24px;
+    }
+    .fc-list-item {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 6px rgba(38,36,33,.04);
+    }
+    .fc-list-item:hover {
+      border-color: var(--accent-soft);
+      box-shadow: 0 4px 12px rgba(38,36,33,.08);
+    }
+    .fc-list-front {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      cursor: pointer;
+      user-select: none;
+      background: #fff;
+    }
+    .fc-list-term {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--ink);
+      line-height: 1.4;
+    }
+    .fc-list-arrow {
+      font-size: 10px;
+      color: var(--ink-soft);
+      transition: transform 0.2s ease;
+    }
+    .fc-list-back {
+      display: none;
+      padding: 0 16px 14px;
+      border-top: 1px dashed var(--line);
+      background: var(--sidebar-bg);
+    }
+    .fc-list-item.expanded .fc-list-back {
+      display: block;
+    }
+    .fc-list-back-text {
+      font-size: 12.5px;
+      color: var(--ink-soft);
+      line-height: 1.6;
+      padding-top: 10px;
+      white-space: pre-wrap;
+    }
+    .fc-list-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      justify-content: flex-end;
+    }
+    .fc-list-act {
+      background: none;
+      border: 1px solid var(--line);
+      color: var(--ink-soft);
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.12s;
+      font-family: var(--sans);
+    }
+    .fc-list-act:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-soft);
+    }
+    .fc-list-act.del:hover {
+      border-color: var(--danger);
+      color: var(--danger);
+      background: rgba(180,67,58,.07);
+    }
+
+    /* Renombrado inline dentro de la lista */
+    .fc-rename-inline-form {
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .fc-rename-inline-input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: var(--sans);
+      outline: none;
+    }
+    .fc-rename-inline-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .fc-rename-inline-btn {
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .fc-rename-inline-btn.save {
+      background: var(--accent);
+      color: #fff;
+    }
+    .fc-rename-inline-btn.cancel {
+      background: none;
+      border: 1px solid var(--line);
+      color: var(--ink-soft);
+    }
+
+    /* ---- Resaltado temporal en textLayer ---- */
+    .temp-highlight {
+      background-color: rgba(233, 185, 73, 0.65) !important;
+      border-radius: 3px;
+      box-shadow: 0 0 10px rgba(233, 185, 73, 0.9);
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+      animation: pulse-highlight 1.5s infinite alternate;
+    }
+    .temp-highlight.fade-out {
+      background-color: transparent !important;
+      box-shadow: none;
+      animation: none;
+    }
+    @keyframes pulse-highlight {
+      from { box-shadow: 0 0 4px rgba(233, 185, 73, 0.5); }
+      to { box-shadow: 0 0 12px rgba(233, 185, 73, 0.95); }
+    }
   </style>
 </head>
 <body>
@@ -529,8 +675,8 @@ const state = {
   searchQuery:'', searchResults:[], searchResultIdx:-1,
   searchBarOpen:false, searchIndex:[],
   tocEntries:[],
-  flashcards:[], flashcardIdx:0,
-  chatCitation:'',
+  flashcards:[], flashcardIdx:0, expandedFlashcards:[], fcFilter:'',
+  chatCitation:'', pendingTextHighlight:null,
   explainTerm:'', explainText:'', explainPage:0, explainVisible:false, explainLoading:false,
   explainLevel: localStorage.getItem(EXPLAIN_LVL_LS) || 'simple',
   explainIsVisual: false, // flag para saber si la explicación es de un elemento visual
@@ -1274,72 +1420,119 @@ function renderTocTab() {
 function renderFlashcardsTab() {
   const b = document.getElementById('sb-body'); if (!b) return;
 
-  // Header siempre visible con botón ＋ Nueva tarjeta
+  // Header siempre visible con botón ＋ Nueva tarjeta y buscador
   const header = `<div class="fc-tab-header">
     <span class="fc-tab-title">Tarjetas (${state.flashcards.length})</span>
     <button class="fc-new-btn" id="fc-new-open">＋ Nueva tarjeta</button>
+  </div>
+  <div class="glossary-search-wrap">
+    <input class="glossary-search" id="fc-search" placeholder="Buscar tarjetas…" value="${esc(state.fcFilter || '')}">
   </div>`;
 
-  if (!state.flashcards.length) {
-    b.innerHTML = header + '<div class="empty-sidebar" style="margin-top:12px">Selecciona texto → ✨ Explicar → 💾 Guardar tarjeta, o usa el botón de arriba para crear una.</div>';
+  const q = (state.fcFilter || '').toLowerCase();
+  const filtered = q ? state.flashcards.filter(f => f.front.toLowerCase().includes(q) || f.back.toLowerCase().includes(q)) : state.flashcards;
+
+  if (filtered.length === 0) {
+    b.innerHTML = header + `<div class="empty-sidebar" style="margin-top:12px">${state.flashcards.length === 0 ? 'Selecciona texto → ✨ Explicar → 💾 Guardar tarjeta, o usa el botón de arriba para crear una.' : 'Sin resultados para "'+esc(state.fcFilter)+'".'}</div>`;
     document.getElementById('fc-new-open').onclick = () => showNewCardForm(b, header);
+    const fs = document.getElementById('fc-search');
+    if (fs) fs.oninput = e => { state.fcFilter = e.target.value; renderFlashcardsTab(); };
     return;
   }
 
-  const idx = Math.min(state.flashcardIdx, state.flashcards.length - 1);
-  const fc = state.flashcards[idx];
   b.innerHTML = header + `
-    <div class="fc-container">
-      <div class="fc-nav">
-        <button class="fc-nav-btn" id="fc-p">‹</button>
-        <span class="fc-count">${idx + 1} / ${state.flashcards.length}</span>
-        <button class="fc-nav-btn" id="fc-n">›</button>
-      </div>
-      <div class="fc-card" id="fc-card">
-        <div class="fc-inner">
-          <div class="fc-front"><div class="fc-term">${esc(fc.front)}</div><div class="fc-tap-hint">Toca para ver</div></div>
-          <div class="fc-back"><div class="fc-back-text">${esc(fc.back)}</div></div>
-        </div>
-      </div>
-      <div class="fc-card-actions">
-        <button class="fc-rename-btn" id="fc-rename">✏️ Renombrar</button>
-        <button class="fc-delete-btn" id="fc-del">🗑 Eliminar</button>
-      </div>
+    <div class="fc-list-container">
+      ${filtered.map(fc => {
+        const isExpanded = state.expandedFlashcards?.includes(fc.id);
+        return `<div class="fc-list-item ${isExpanded ? 'expanded' : ''}" data-id="${fc.id}">
+          <div class="fc-list-front">
+            <span class="fc-list-term">${esc(fc.front)}</span>
+            <span class="fc-list-arrow">${isExpanded ? '▼' : '▶'}</span>
+          </div>
+          <div class="fc-list-back">
+            <div class="fc-list-back-text">${esc(fc.back)}</div>
+            <div class="fc-list-actions">
+              <button class="fc-list-act rename" data-id="${fc.id}">✏️ Renombrar</button>
+              <button class="fc-list-act del" data-id="${fc.id}">🗑 Eliminar</button>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
     </div>`;
 
   document.getElementById('fc-new-open').onclick = () => showNewCardForm(b, header);
-  document.getElementById('fc-card').onclick = () => document.getElementById('fc-card').classList.toggle('flipped');
-  document.getElementById('fc-p').onclick = () => { state.flashcardIdx = Math.max(0, idx - 1); renderFlashcardsTab(); };
-  document.getElementById('fc-n').onclick = () => { state.flashcardIdx = Math.min(state.flashcards.length - 1, idx + 1); renderFlashcardsTab(); };
-  document.getElementById('fc-del').onclick = async () => {
-    if (!confirm('¿Eliminar esta tarjeta?')) return;
-    await state.sb.from('flashcards').delete().eq('id', fc.id);
-    state.flashcards.splice(idx, 1);
-    state.flashcardIdx = Math.min(idx, state.flashcards.length - 1);
-    renderSidebar();
-  };
-  document.getElementById('fc-rename').onclick = () => {
-    b.innerHTML = header + `<div class="fc-rename-wrap">
-      <div style="flex:1">
-        <label style="font-size:11.5px;font-weight:500;color:var(--ink-soft);display:block;margin-bottom:4px">Nuevo título del frente:</label>
-        <input class="fc-rename-input" id="fc-rename-input" value="${esc(fc.front)}">
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;padding:0 16px 16px">
-      <button class="fc-rename-save" id="fc-rename-save">Guardar</button>
-      <button class="fc-rename-cancel" id="fc-rename-cancel">Cancelar</button>
-    </div>`;
-    document.getElementById('fc-new-open').onclick = () => renderFlashcardsTab();
-    const inp = document.getElementById('fc-rename-input');
-    inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length;
-    document.getElementById('fc-rename-cancel').onclick = () => renderFlashcardsTab();
-    document.getElementById('fc-rename-save').onclick = async () => {
-      const newFront = inp.value.trim(); if (!newFront) return;
-      await state.sb.from('flashcards').update({ front: newFront }).eq('id', fc.id);
-      fc.front = newFront;
+  
+  const fs = document.getElementById('fc-search');
+  if (fs) fs.oninput = e => { state.fcFilter = e.target.value; renderFlashcardsTab(); };
+
+  // Toggle expandir tarjeta al hacer click en el encabezado
+  b.querySelectorAll('.fc-list-item').forEach(el => {
+    const front = el.querySelector('.fc-list-front');
+    front.onclick = (e) => {
+      const id = el.dataset.id;
+      if (!state.expandedFlashcards) state.expandedFlashcards = [];
+      if (state.expandedFlashcards.includes(id)) {
+        state.expandedFlashcards = state.expandedFlashcards.filter(x => x !== id);
+      } else {
+        state.expandedFlashcards.push(id);
+      }
       renderFlashcardsTab();
     };
-  };
+  });
+
+  // Botones de eliminar
+  b.querySelectorAll('.fc-list-act.del').forEach(btn => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      if (!confirm('¿Eliminar esta tarjeta?')) return;
+      const id = btn.dataset.id;
+      await state.sb.from('flashcards').delete().eq('id', id);
+      state.flashcards = state.flashcards.filter(f => f.id !== id);
+      renderFlashcardsTab();
+    };
+  });
+
+  // Botones de renombrar
+  b.querySelectorAll('.fc-list-act.rename').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      const fc = state.flashcards.find(f => f.id === id);
+      if (!fc) return;
+      
+      const itemEl = b.querySelector(`.fc-list-item[data-id="${id}"]`);
+      if (!itemEl) return;
+      
+      itemEl.innerHTML = `
+        <div class="fc-rename-inline-form">
+          <input class="fc-rename-inline-input" id="fc-rename-inp-${id}" value="${esc(fc.front)}">
+          <div class="fc-rename-inline-actions">
+            <button class="fc-rename-inline-btn save" id="fc-rename-save-${id}">Guardar</button>
+            <button class="fc-rename-inline-btn cancel" id="fc-rename-cancel-${id}">Cancelar</button>
+          </div>
+        </div>`;
+        
+      const inp = document.getElementById(`fc-rename-inp-${id}`);
+      inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length;
+      
+      // Detener propagación de click para que al hacer click en el input/botones no intente colapsar/expandir el item
+      itemEl.querySelector('.fc-rename-inline-form').onclick = ev => ev.stopPropagation();
+      
+      document.getElementById(`fc-rename-cancel-${id}`).onclick = (ev) => {
+        ev.stopPropagation();
+        renderFlashcardsTab();
+      };
+      
+      document.getElementById(`fc-rename-save-${id}`).onclick = async (ev) => {
+        ev.stopPropagation();
+        const newFront = inp.value.trim();
+        if (!newFront) return;
+        await state.sb.from('flashcards').update({ front: newFront }).eq('id', id);
+        fc.front = newFront;
+        renderFlashcardsTab();
+      };
+    };
+  });
 }
 
 function showNewCardForm(b, header) {
@@ -1365,7 +1558,8 @@ function showNewCardForm(b, header) {
       }).select().single();
       if (error) throw error;
       state.flashcards.push(data);
-      state.flashcardIdx = state.flashcards.length - 1;
+      if (!state.expandedFlashcards) state.expandedFlashcards = [];
+      state.expandedFlashcards.push(data.id); // Autoexpandir la nueva tarjeta
       renderFlashcardsTab();
     } catch (err) {
       btn.textContent = '⚠️ Error';
@@ -1498,13 +1692,19 @@ function renderChatTab(){
     </div>
   </div>`;
   document.getElementById('cm').scrollTop=999999;
-  // Citas clickeables → navegar a la página de origen
+  // Citas clickeables → navegar a la página de origen y resaltar el texto
   document.getElementById('cm').querySelectorAll('.chat-cite-block').forEach(el => {
-    el.onclick = () => {
+    el.onclick = (e) => {
+      // Alternar expansión para poder leer la cita completa si es larga
+      el.classList.toggle('expanded');
+      
       const citeText = el.dataset.cite || '';
       if (!citeText) return;
       const match = state.searchIndex.find(p => p.text.toLowerCase().includes(citeText.toLowerCase().slice(0, 40)));
-      if (match) goToPage(match.page);
+      if (match) {
+        state.pendingTextHighlight = citeText;
+        goToPage(match.page);
+      }
     };
   });
   document.getElementById('cm').querySelectorAll('.cm-act').forEach(btn => {
@@ -2086,6 +2286,11 @@ async function renderPage(num) {
   detectVisualPage(num);
   // Si el modo visual está activo, re-montar el overlay de recorte
   if (state.visualMode) mountVisualCrop();
+
+  if (state.pendingTextHighlight) {
+    highlightTextInPage(state.pendingTextHighlight);
+    state.pendingTextHighlight = null;
+  }
 }
 
 function drawHL(pn) {
@@ -2335,7 +2540,114 @@ async function commitHL(color) {
 document.addEventListener('mousedown', e => {
   const b = document.getElementById('sel-tb');
   if (b && b.style.display !== 'none' && !b.contains(e.target)) hideSelectionToolbar();
+  
+  const cb = document.getElementById('chat-sel-tb');
+  if (cb && cb.style.display !== 'none' && !cb.contains(e.target)) hideChatSelectionToolbar();
 });
+
+// ---- Resaltado temporal del texto citado ----
+function highlightTextInPage(searchText) {
+  const cleanSearch = searchText.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!cleanSearch || cleanSearch.length < 5) return;
+  const container = document.getElementById('text-layer');
+  if (!container) return;
+  const divs = Array.from(container.querySelectorAll('span, div'));
+  
+  let found = false;
+  // Intento 1: buscar coincidencia directa en el div
+  for (const div of divs) {
+    const divText = div.textContent.toLowerCase().replace(/\s+/g, ' ');
+    if (divText.includes(cleanSearch) || (cleanSearch.includes(divText) && divText.length > 8)) {
+      div.classList.add('temp-highlight');
+      found = true;
+    }
+  }
+  
+  // Intento 2: si no se encontró por fragmentación del textLayer, buscar por palabras clave significativas
+  if (!found) {
+    const words = cleanSearch.split(' ').filter(w => w.length > 4);
+    if (words.length > 0) {
+      divs.forEach(div => {
+        const divText = div.textContent.toLowerCase();
+        if (words.some(w => divText.includes(w))) {
+          div.classList.add('temp-highlight');
+        }
+      });
+    }
+  }
+  
+  // Desvanecer y remover
+  setTimeout(() => {
+    container.querySelectorAll('.temp-highlight').forEach(el => {
+      el.classList.add('fade-out');
+      setTimeout(() => {
+        el.classList.remove('temp-highlight', 'fade-out');
+      }, 800);
+    });
+  }, 3500);
+}
+
+// ---- Selección de texto dentro de mensajes de Chat ----
+function handleChatSelection() {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.rangeCount) { hideChatSelectionToolbar(); return; }
+  const text = sel.toString().trim();
+  if (!text || text.length < 2) { hideChatSelectionToolbar(); return; }
+  
+  // Validar si la selección ocurrió dentro del panel de mensajes
+  const range = sel.getRangeAt(0);
+  const chatContainer = document.getElementById('cm');
+  if (!chatContainer || !chatContainer.contains(range.commonAncestorContainer)) { return; }
+  
+  const rects = range.getClientRects();
+  if (!rects.length) return;
+  const r = rects[0];
+  
+  showChatSelectionToolbar(r, text);
+}
+
+function showChatSelectionToolbar(r, text) {
+  let bar = document.getElementById('chat-sel-tb');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'chat-sel-tb';
+    bar.className = 'selection-toolbar chat-sel';
+    document.body.appendChild(bar);
+  }
+  bar.innerHTML = `<button class="explain-btn" id="chat-ex-btn">✨ Explicar</button>
+                   <button class="explain-btn" id="chat-ask-btn">💬 Preguntar</button>`;
+  
+  bar.style.position = 'fixed';
+  bar.style.left = (r.left + r.width / 2) + 'px';
+  bar.style.top = (r.top - 48) + 'px';
+  bar.style.display = 'flex';
+  bar.style.zIndex = '1000';
+  
+  document.getElementById('chat-ex-btn').onmousedown = e => e.stopPropagation();
+  document.getElementById('chat-ex-btn').onclick = () => {
+    hideChatSelectionToolbar();
+    window.getSelection().removeAllRanges();
+    if (!state.geminiKey) { state.sidebarTab = 'chat'; toggleSidebar(true); renderSidebar(); return; }
+    triggerExplain(text, state.pageNum);
+  };
+  
+  document.getElementById('chat-ask-btn').onmousedown = e => e.stopPropagation();
+  document.getElementById('chat-ask-btn').onclick = () => {
+    hideChatSelectionToolbar();
+    window.getSelection().removeAllRanges();
+    state.chatCitation = text;
+    renderChatTab();
+    setTimeout(() => document.getElementById('ci')?.focus(), 50);
+  };
+}
+
+function hideChatSelectionToolbar() {
+  const bar = document.getElementById('chat-sel-tb');
+  if (bar) bar.style.display = 'none';
+}
+
+document.addEventListener('mouseup', handleChatSelection);
+document.addEventListener('touchend', () => setTimeout(handleChatSelection, 100));
 
 // ============================================================
 // Boot
