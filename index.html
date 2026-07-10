@@ -1417,6 +1417,7 @@ function renderTocTab() {
 }
 
 // ---- Flashcards ----
+// ---- Flashcards ----
 function renderFlashcardsTab() {
   const b = document.getElementById('sb-body'); if (!b) return;
 
@@ -1440,21 +1441,27 @@ function renderFlashcardsTab() {
     return;
   }
 
+  // Lista vertical de tarjetas 3D
   b.innerHTML = header + `
-    <div class="fc-list-container">
+    <div class="fc-grid-container" style="display:flex; flex-direction:column; gap:20px; padding:0 16px 24px;">
       ${filtered.map(fc => {
-        const isExpanded = state.expandedFlashcards?.includes(fc.id);
-        return `<div class="fc-list-item ${isExpanded ? 'expanded' : ''}" data-id="${fc.id}">
-          <div class="fc-list-front">
-            <span class="fc-list-term">${esc(fc.front)}</span>
-            <span class="fc-list-arrow">${isExpanded ? '▼' : '▶'}</span>
-          </div>
-          <div class="fc-list-back">
-            <div class="fc-list-back-text">${esc(fc.back)}</div>
-            <div class="fc-list-actions">
-              <button class="fc-list-act rename" data-id="${fc.id}">✏️ Renombrar</button>
-              <button class="fc-list-act del" data-id="${fc.id}">🗑 Eliminar</button>
+        const isFlipped = state.expandedFlashcards?.includes(fc.id);
+        return `
+        <div class="fc-card-item" data-id="${fc.id}" style="display:flex; flex-direction:column; gap:8px;">
+          <div class="fc-card ${isFlipped ? 'flipped' : ''}" id="fc-card-${fc.id}" style="perspective:1200px; cursor:pointer; min-height:160px;">
+            <div class="fc-inner">
+              <div class="fc-front">
+                <div class="fc-term" style="font-size:13.5px; font-weight:600; text-align:center;">${esc(fc.front)}</div>
+                <div class="fc-tap-hint" style="font-size:9.5px; opacity:0.7; margin-top:12px;">Toca para ver</div>
+              </div>
+              <div class="fc-back">
+                <div class="fc-back-text" style="font-size:12.5px; line-height:1.55;">${esc(fc.back)}</div>
+              </div>
             </div>
+          </div>
+          <div class="fc-card-actions" style="display:flex; gap:8px; justify-content:flex-end;">
+            <button class="fc-rename-btn" data-id="${fc.id}">✏️ Renombrar</button>
+            <button class="fc-delete-btn" data-id="${fc.id}">🗑 Eliminar</button>
           </div>
         </div>`;
       }).join('')}
@@ -1465,23 +1472,22 @@ function renderFlashcardsTab() {
   const fs = document.getElementById('fc-search');
   if (fs) fs.oninput = e => { state.fcFilter = e.target.value; renderFlashcardsTab(); };
 
-  // Toggle expandir tarjeta al hacer click en el encabezado
-  b.querySelectorAll('.fc-list-item').forEach(el => {
-    const front = el.querySelector('.fc-list-front');
-    front.onclick = (e) => {
-      const id = el.dataset.id;
+  // Voltear tarjeta individual al hacer click
+  b.querySelectorAll('.fc-card').forEach(card => {
+    card.onclick = () => {
+      const id = card.id.replace('fc-card-', '');
+      card.classList.toggle('flipped');
       if (!state.expandedFlashcards) state.expandedFlashcards = [];
-      if (state.expandedFlashcards.includes(id)) {
-        state.expandedFlashcards = state.expandedFlashcards.filter(x => x !== id);
+      if (card.classList.contains('flipped')) {
+        if (!state.expandedFlashcards.includes(id)) state.expandedFlashcards.push(id);
       } else {
-        state.expandedFlashcards.push(id);
+        state.expandedFlashcards = state.expandedFlashcards.filter(x => x !== id);
       }
-      renderFlashcardsTab();
     };
   });
 
-  // Botones de eliminar
-  b.querySelectorAll('.fc-list-act.del').forEach(btn => {
+  // Botón de eliminar
+  b.querySelectorAll('.fc-delete-btn').forEach(btn => {
     btn.onclick = async (e) => {
       e.stopPropagation();
       if (!confirm('¿Eliminar esta tarjeta?')) return;
@@ -1492,37 +1498,35 @@ function renderFlashcardsTab() {
     };
   });
 
-  // Botones de renombrar
-  b.querySelectorAll('.fc-list-act.rename').forEach(btn => {
+  // Botón de renombrar
+  b.querySelectorAll('.fc-rename-btn').forEach(btn => {
     btn.onclick = (e) => {
       e.stopPropagation();
       const id = btn.dataset.id;
       const fc = state.flashcards.find(f => f.id === id);
       if (!fc) return;
-      
-      const itemEl = b.querySelector(`.fc-list-item[data-id="${id}"]`);
-      if (!itemEl) return;
-      
-      itemEl.innerHTML = `
-        <div class="fc-rename-inline-form">
-          <input class="fc-rename-inline-input" id="fc-rename-inp-${id}" value="${esc(fc.front)}">
-          <div class="fc-rename-inline-actions">
-            <button class="fc-rename-inline-btn save" id="fc-rename-save-${id}">Guardar</button>
-            <button class="fc-rename-inline-btn cancel" id="fc-rename-cancel-${id}">Cancelar</button>
+
+      const cardItem = b.querySelector(`.fc-card-item[data-id="${id}"]`);
+      if (!cardItem) return;
+
+      cardItem.innerHTML = `
+        <div class="fc-rename-inline-form" style="border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 16px;">
+          <label style="font-size:11.5px; font-weight:500; color:var(--ink-soft); display:block; margin-bottom:6px;">Nuevo título del frente:</label>
+          <input class="fc-rename-inline-input" id="fc-rename-inp-${id}" value="${esc(fc.front)}" style="width:100%; padding:8px 12px; border:1px solid var(--accent); border-radius:8px; outline:none; font-size:13px; font-family:var(--sans);">
+          <div class="fc-rename-inline-actions" style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+            <button class="fc-rename-inline-btn save" id="fc-rename-save-${id}" style="background:var(--accent); color:#fff; border:none; padding:6px 12px; border-radius:6px; font-size:11.5px; cursor:pointer;">Guardar</button>
+            <button class="fc-rename-inline-btn cancel" id="fc-rename-cancel-${id}" style="background:none; border:1px solid var(--line); color:var(--ink-soft); padding:6px 12px; border-radius:6px; font-size:11.5px; cursor:pointer;">Cancelar</button>
           </div>
         </div>`;
-        
+
       const inp = document.getElementById(`fc-rename-inp-${id}`);
       inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length;
-      
-      // Detener propagación de click para que al hacer click en el input/botones no intente colapsar/expandir el item
-      itemEl.querySelector('.fc-rename-inline-form').onclick = ev => ev.stopPropagation();
-      
+
       document.getElementById(`fc-rename-cancel-${id}`).onclick = (ev) => {
         ev.stopPropagation();
         renderFlashcardsTab();
       };
-      
+
       document.getElementById(`fc-rename-save-${id}`).onclick = async (ev) => {
         ev.stopPropagation();
         const newFront = inp.value.trim();
@@ -1559,7 +1563,7 @@ function showNewCardForm(b, header) {
       if (error) throw error;
       state.flashcards.push(data);
       if (!state.expandedFlashcards) state.expandedFlashcards = [];
-      state.expandedFlashcards.push(data.id); // Autoexpandir la nueva tarjeta
+      // No voltear la nueva tarjeta de inmediato para que se vea el frente primero
       renderFlashcardsTab();
     } catch (err) {
       btn.textContent = '⚠️ Error';
@@ -1680,10 +1684,9 @@ function renderChatTab(){
     <div class="chat-messages" id="cm">${mc===0?'<div class="chat-empty">Pregunta sobre el documento o selecciona texto y pulsa "✨ Explicar".</div>':''}${state.chatMessages.map((m,i)=>{
       const isUser = m.role==='user';
       const editBtn = isUser ? `<button class="cm-act" data-act="edit" data-idx="${i}">✏️ Editar</button>` : '';
-      const modelBtns = !isUser ? `<button class="cm-act explain" data-act="explain" data-idx="${i}">✨ Explicar</button><button class="cm-act ask-about" data-act="ask-about" data-idx="${i}">💬 Preguntar</button>` : '';
       return `<div class="chat-msg-wrap ${m.role}" data-idx="${i}">
         <div class="chat-msg">${parseChatMsg(m.text)}</div>
-        <div class="chat-msg-actions">${editBtn}${modelBtns}<button class="cm-act del" data-act="del" data-idx="${i}">🗑 Eliminar</button></div>
+        <div class="chat-msg-actions">${editBtn}<button class="cm-act del" data-act="del" data-idx="${i}">🗑 Eliminar</button></div>
       </div>`;
     }).join('')}${state.chatBusy?'<div class="chat-msg-wrap model"><div class="chat-msg pending">Pensando…</div></div>':''}</div>
     <div class="chat-input-row">
@@ -1712,18 +1715,6 @@ function renderChatTab(){
       const idx = parseInt(btn.dataset.idx);
       if (btn.dataset.act === 'del') deleteChatMessage(idx);
       else if (btn.dataset.act === 'edit') startEditMessage(idx);
-      else if (btn.dataset.act === 'explain') {
-        const msg = state.chatMessages[idx];
-        if (!msg) return;
-        if (!state.geminiKey) { state.sidebarTab = 'chat'; toggleSidebar(true); renderSidebar(); return; }
-        triggerExplain(msg.text.slice(0, 120), state.pageNum);
-      } else if (btn.dataset.act === 'ask-about') {
-        const msg = state.chatMessages[idx];
-        if (!msg) return;
-        state.chatCitation = msg.text.slice(0, 200);
-        renderChatTab();
-        setTimeout(() => document.getElementById('ci')?.focus(), 50);
-      }
     };
   });
   document.getElementById('th-sel').onchange=async e=>{state.currentThreadId=e.target.value;await loadThreadMsgs(state.currentThreadId);renderChatTab()};
