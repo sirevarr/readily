@@ -1609,22 +1609,33 @@ function renderGlossaryTab() {
   const gs = document.getElementById('gl-search');
   if (gs) gs.oninput = e => { state.glossaryFilter = e.target.value; renderGlossaryTab(); };
 
-  // Eliminar — listener directo sobre botón, stopPropagation antes del item
+  // Eliminar — onclick directo en el botón (evita conflictos de propagación)
   b.querySelectorAll('.glossary-del').forEach(btn => {
-    btn.addEventListener('click', async e => {
+    btn.onclick = async (e) => {
       e.stopPropagation();
       e.preventDefault();
       const id = btn.dataset.id;
+      if (!id) return;
+      const confirmDelete = confirm('¿Eliminar este término del glosario?');
+      if (!confirmDelete) return;
       btn.disabled = true;
-      await state.sb.from('glossary').delete().eq('id', id).catch(()=>{});
-      state.glossary = state.glossary.filter(g => g.id !== id);
-      renderGlossaryTab();
-    });
+      btn.textContent = '...';
+      try {
+        await state.sb.from('glossary').delete().eq('id', id);
+        state.glossary = state.glossary.filter(g => g.id !== id);
+        renderGlossaryTab();
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = '🗑 Eliminar';
+        alert('Error al eliminar: ' + (err.message || err));
+      }
+    };
   });
 
+  // Click item → panel de explicación (ignorar si el click es en un botón)
   // → Tarjeta
   b.querySelectorAll('.glossary-add-card').forEach(btn => {
-    btn.addEventListener('click', async e => {
+    btn.onclick = async (e) => {
       e.stopPropagation();
       e.preventDefault();
       const id = btn.dataset.id;
@@ -1642,13 +1653,12 @@ function renderGlossaryTab() {
       } catch (err) {
         btn.textContent = '⚠️ Error'; btn.disabled = false;
       }
-    });
+    };
   });
 
-  // Click item → panel de explicación
+  // Click item → panel de explicación (ignorar si el click es en un botón)
   b.querySelectorAll('.glossary-item').forEach(el => {
-    el.addEventListener('click', e => {
-      // Ignorar clicks en botones dentro del item
+    el.onclick = (e) => {
       if (e.target.closest('button')) return;
       const g = state.glossary.find(x => x.id === el.dataset.id);
       if (!g) return;
@@ -1656,7 +1666,7 @@ function renderGlossaryTab() {
       state.explainPage = g.page || state.pageNum; state.explainVisible = true; state.explainLoading = false;
       state.explainLevel = g.level || 'simple';
       renderExplainPanel();
-    });
+    };
   });
 }
 
@@ -2634,9 +2644,16 @@ function showChatSelectionToolbar(r, text) {
   document.getElementById('chat-ask-btn').onclick = () => {
     hideChatSelectionToolbar();
     window.getSelection().removeAllRanges();
+    // Activar cita: asegurar que el sidebar muestre chat y la cita quede visible
     state.chatCitation = text;
-    renderChatTab();
-    setTimeout(() => document.getElementById('ci')?.focus(), 50);
+    state.sidebarTab = 'chat';
+    toggleSidebar(true);
+    renderSidebar();
+    // Enfocar el input con un pequeño delay para que el DOM esté listo
+    setTimeout(() => {
+      const ci = document.getElementById('ci');
+      if (ci) { ci.focus(); ci.placeholder = `↩ Pregunta sobre: "${text.slice(0, 40).trim()}…"`; }
+    }, 80);
   };
 }
 
