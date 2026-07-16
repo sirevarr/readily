@@ -226,6 +226,10 @@
     .thread-btn{background:none;border:1px solid var(--line);color:var(--ink-soft);width:26px;height:26px;border-radius:6px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
     .thread-btn:hover{background:var(--accent-soft);border-color:var(--accent)}
     .thread-btn.danger:hover{background:rgba(180,67,58,.1);border-color:#B4433A;color:#B4433A}
+    /* Rate limit banner */
+    .rate-limit-banner{background:#FDF0F0;border:1px solid rgba(180,67,58,.3);border-radius:10px;padding:10px 13px;font-size:12px;color:#B4433A;line-height:1.5;margin:6px 12px}
+    .rate-limit-banner b{display:block;font-size:13px;margin-bottom:3px}
+    .rate-limit-countdown{font-weight:600;font-size:13px}
     .chat-header-bar{display:flex;justify-content:space-between;align-items:center;padding:7px 12px;border-bottom:1px solid var(--line);flex-shrink:0}
     .chat-header-bar span{font-size:12px;color:var(--ink-soft)}
     .chat-action-btn{background:none;border:none;color:var(--ink-soft);font-size:11px;cursor:pointer;text-decoration:underline}
@@ -236,7 +240,12 @@
     .chat-key-input{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:var(--r);font-size:13px;font-family:var(--sans);margin:12px 0 10px;outline:none}
     .chat-key-input:focus{border-color:var(--accent)}
     .chat-messages{flex:1;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:10px}
-    .chat-msg{font-size:13px;line-height:1.55;padding:9px 13px;border-radius:12px;max-width:93%;white-space:pre-wrap;word-break:break-word}
+    .chat-msg{font-size:13px;line-height:1.55;padding:9px 13px;border-radius:12px;max-width:93%;word-break:break-word}
+    .chat-msg p{margin:0 0 6px}.chat-msg p:last-child{margin-bottom:0}
+    .chat-msg u{text-decoration:underline;text-underline-offset:2px}
+    .chat-msg em{font-style:italic}
+    .chat-msg strong{font-weight:700}
+    .chat-msg code{font-family:monospace;background:rgba(0,0,0,.07);padding:1px 5px;border-radius:4px;font-size:12px}
     .chat-cite-block{background:rgba(255,255,255,0.2);color:#fff;padding:6px 10px;border-radius:8px;font-size:11px;font-style:italic;margin-bottom:8px;border-left:3px solid rgba(255,255,255,0.5);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis}
     .chat-msg-wrap{display:flex;flex-direction:column;gap:3px;max-width:93%}
     .chat-msg-wrap.user{align-self:flex-end;align-items:flex-end}
@@ -1051,7 +1060,8 @@ async function onUpload(e) {
   const prog = document.getElementById('upload-progress'); prog.style.display = 'block';
   for (let i = 0; i < files.length; i++) {
     const f = files[i]; prog.textContent = `Subiendo ${i+1}/${files.length}: ${f.name}…`;
-    const path = `${state.session.user.id}/${Date.now()}_${f.name}`;
+    const safeName = f.name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]/g,'_');
+    const path = `${state.session.user.id}/${Date.now()}_${safeName}`;
     const { error } = await state.sb.storage.from('pdfs').upload(path, f);
     if (error) { alert('Error: ' + error.message); continue; }
     const buf = await f.arrayBuffer();
@@ -1670,17 +1680,51 @@ function renderGlossaryTab() {
   });
 }
 
-// ---- Chat ----
+// ---- Chat — Markdown renderer ----
+function renderMarkdown(raw) {
+  // Procesa markdown básico sin permitir HTML arbitrario
+  let lines = raw.split('\n');
+  let html = '';
+  let inPre = false;
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    // Code blocks (```)
+    if (line.startsWith('```')) { inPre = !inPre; html += inPre ? '<pre style="background:rgba(0,0,0,.06);padding:8px 10px;border-radius:7px;overflow-x:auto;margin:4px 0;font-size:12px">' : '</pre>'; continue; }
+    if (inPre) { html += esc(line) + '\n'; continue; }
+    // Escape HTML first
+    line = esc(line);
+    // Bold **text** → <u>text</u>
+    line = line.replace(/\*\*(.+?)\*\*/g, '<u>$1</u>');
+    // Italic *text* or _text_ → <em>text</em>
+    line = line.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+    line = line.replace(/\_([^_]+)\_/g, '<em>$1</em>');
+    // Inline code `code`
+    line = line.replace(/`([^`]+)`/g, '<code>$1</code>');
+    // Headings
+    if (/^### /.test(line)) { html += '<p style="font-weight:700;margin:6px 0 2px">' + line.slice(4) + '</p>'; continue; }
+    if (/^## /.test(line))  { html += '<p style="font-weight:700;margin:6px 0 2px">' + line.slice(3) + '</p>'; continue; }
+    if (/^# /.test(line))   { html += '<p style="font-weight:700;margin:6px 0 2px">' + line.slice(2) + '</p>'; continue; }
+    // Bullet lists
+    if (/^[\-\*] /.test(line)) { html += '<p style="margin:2px 0 2px 10px">• ' + line.slice(2) + '</p>'; continue; }
+    // Empty line → separator
+    if (line.trim() === '') { html += '<div style="height:6px"></div>'; continue; }
+    // Normal line
+    html += '<p>' + line + '</p>';
+  }
+  if (inPre) html += '</pre>';
+  return html;
+}
+
 function parseChatMsg(text) {
   if (text.startsWith('> "')) {
     const parts = text.split('"\n\n');
     if (parts.length >= 2) {
       const cite = parts[0].substring(3);
       const q = parts.slice(1).join('"\n\n');
-      return `<div class="chat-cite-block" data-cite="${esc(cite)}">"${esc(cite)}"</div>${esc(q)}`;
+      return `<div class="chat-cite-block" data-cite="${esc(cite)}">"${esc(cite)}"</div>${renderMarkdown(q)}`;
     }
   }
-  return esc(text);
+  return renderMarkdown(text);
 }
 
 function renderChatTab(){
@@ -1696,12 +1740,25 @@ function renderChatTab(){
     <div class="thread-bar">
       <select id="th-sel">${state.chatThreads.map(t=>`<option value="${t.id}" ${t.id===state.currentThreadId?'selected':''}>${esc(t.title)}</option>`).join('')}</select>
       <button class="thread-btn" id="th-new" title="Nuevo chat">＋</button>
+      <button class="thread-btn" id="th-rename" title="Renombrar chat">✏️</button>
       <button class="thread-btn danger" id="th-del" title="Eliminar chat">🗑</button>
     </div>
     <div class="chat-header-bar"><span>${mc>0?mc+' msgs':'Vacío'}</span><div style="display:flex;gap:8px"><button class="chat-action-btn" id="ck-btn">Cambiar clave</button></div></div>
     <div class="chat-messages" id="cm">${mc===0?'<div class="chat-empty">Pregunta sobre el documento o selecciona texto y pulsa "✨ Explicar".</div>':''}${state.chatMessages.map((m,i)=>{
       const isUser = m.role==='user';
       const editBtn = isUser ? `<button class="cm-act" data-act="edit" data-idx="${i}">✏️ Editar</button>` : '';
+      // Mostrar banner de rate limit en lugar del mensaje de error
+      if(!isUser && typeof m.text==='string' && m.text.startsWith('__RATE_LIMIT__:')){
+        const parts=m.text.split(':'); const secs=parseInt(parts[1])||60;
+        return `<div class="chat-msg-wrap model" data-idx="${i}">
+          <div id="rate-limit-banner" class="rate-limit-banner">
+            <b>⏱ Límite de llamadas alcanzado</b>
+            Has superado el límite gratuito de Gemini. Por favor espera <span id="rate-limit-timer" class="rate-limit-countdown">${secs}s</span> para volver a enviar mensajes.<br>
+            <small style="opacity:.7">Tip: consigue una clave con cuota mayor en <a href="https://ai.dev" target="_blank" style="color:#B4433A">ai.dev</a></small>
+          </div>
+          <div class="chat-msg-actions"><button class="cm-act del" data-act="del" data-idx="${i}">🗑 Eliminar</button></div>
+        </div>`;
+      }
       return `<div class="chat-msg-wrap ${m.role}" data-idx="${i}">
         <div class="chat-msg">${parseChatMsg(m.text)}</div>
         <div class="chat-msg-actions">${editBtn}<button class="cm-act del" data-act="del" data-idx="${i}">🗑 Eliminar</button></div>
@@ -1737,6 +1794,7 @@ function renderChatTab(){
   });
   document.getElementById('th-sel').onchange=async e=>{state.currentThreadId=e.target.value;await loadThreadMsgs(state.currentThreadId);renderChatTab()};
   document.getElementById('th-new').onclick=async()=>{const t=prompt('Nombre:',`Chat ${state.chatThreads.length+1}`);if(!t)return;const{data}=await state.sb.from('chat_threads').insert({document_id:state.currentDoc.id,title:t,user_id:state.session.user.id}).select().single();if(data){state.chatThreads.push(data);state.currentThreadId=data.id;state.chatMessages=[];renderChatTab()}};
+  document.getElementById('th-rename').onclick=async()=>{const cur=state.chatThreads.find(t=>t.id===state.currentThreadId);if(!cur)return;const t=prompt('Nuevo nombre:',cur.title);if(!t||t===cur.title)return;const{error}=await state.sb.from('chat_threads').update({title:t}).eq('id',state.currentThreadId);if(!error){cur.title=t;renderChatTab();}};
   document.getElementById('th-del').onclick=async()=>{if(state.chatThreads.length<=1){alert('Necesitas al menos un chat.');return}if(!confirm('¿Eliminar este chat?'))return;await state.sb.from('chat_threads').delete().eq('id',state.currentThreadId);state.chatThreads=state.chatThreads.filter(t=>t.id!==state.currentThreadId);state.currentThreadId=state.chatThreads[0].id;await loadThreadMsgs(state.currentThreadId);renderChatTab()};
   document.getElementById('ck-btn').onclick=()=>{state.geminiKey='';localStorage.removeItem(GEMINI_KEY_LS);renderChatTab()};
   const inp=document.getElementById('ci');
@@ -1754,7 +1812,27 @@ async function sendChat(text){
   }
   state.chatMessages.push({role:'user',text:uiText});state.chatBusy=true;renderChatTab();
   const reply=await askGemini(promptText);
-  state.chatBusy=false;state.chatMessages.push({role:'model',text:reply});
+  state.chatBusy=false;
+
+  // Manejar rate limit
+  if(typeof reply==='string' && reply.startsWith('__RATE_LIMIT__:')){
+    const parts=reply.split(':');
+    const secs=parseInt(parts[1])||60;
+    const errMsg=parts.slice(2).join(':');
+    state.chatMessages.push({role:'model',text:'__RATE_LIMIT__:'+secs+':'+errMsg});
+    renderChatTab();
+    // Iniciar cuenta atrás
+    let remaining=secs;
+    const tickerId=setInterval(()=>{
+      remaining--;
+      const el=document.getElementById('rate-limit-timer');
+      if(el) el.textContent=remaining+'s';
+      if(remaining<=0){ clearInterval(tickerId); const banner=document.getElementById('rate-limit-banner'); if(banner){ banner.innerHTML='<b>✅ Ya puedes reintentar</b>Cuota repuesta. Escribe tu mensaje de nuevo.'; } }
+    },1000);
+    return;
+  }
+
+  state.chatMessages.push({role:'model',text:reply});
   renderChatTab();
   const { data, error } = await state.sb.from('chat_messages').insert([
     {document_id:state.currentDoc.id,thread_id:state.currentThreadId,role:'user',content:uiText,user_id:state.session.user.id},
@@ -1771,10 +1849,12 @@ async function sendChat(text){
 }
 
 async function deleteChatMessage(idx) {
-  if (!confirm('¿Eliminar este mensaje?')) return;
-  const msg = state.chatMessages[idx];
-  if (msg?.id) await state.sb.from('chat_messages').delete().eq('id', msg.id);
-  state.chatMessages.splice(idx, 1);
+  const toDelete = state.chatMessages.slice(idx);
+  const count = toDelete.length;
+  if (!confirm(`¿Eliminar este mensaje${count > 1 ? ` y los ${count - 1} mensaje(s) posteriores` : ''}?`)) return;
+  const ids = toDelete.map(m => m.id).filter(Boolean);
+  if (ids.length > 0) await state.sb.from('chat_messages').delete().in('id', ids);
+  state.chatMessages = state.chatMessages.slice(0, idx);
   renderChatTab();
 }
 
@@ -1837,7 +1917,16 @@ Reglas adicionales de conversación:
       method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({ systemInstruction:{parts:[{text:sys}]}, contents: history })
     });
-    const d=await r.json();if(d.error)return`Error: ${d.error.message}`;
+    const d=await r.json();
+    if(d.error){
+      const msg=d.error.message||'';
+      const retryMatch=msg.match(/retry in ([\d.]+)s/i);
+      const secs=retryMatch?Math.ceil(parseFloat(retryMatch[1])):null;
+      if(secs){
+        return `__RATE_LIMIT__:${secs}:${msg}`;
+      }
+      return `Error: ${msg}`;
+    }
     return d.candidates?.[0]?.content?.parts?.map(p=>p.text).join('')||'Sin respuesta.';
   }catch(e){return`Error de conexión: ${e.message}`}
 }
