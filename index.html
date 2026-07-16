@@ -653,7 +653,7 @@ const GEMINI_KEY_LS  = 'readily_gemini_key';
 const SB_URL_LS      = 'readily_sb_url';
 const SB_KEY_LS      = 'readily_sb_key';
 const EXPLAIN_LVL_LS = 'readily_explain_level';
-const GEMINI_API     = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+const GEMINI_API     = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-latest:generateContent';
 const MAX_CTX        = 30;
 const QUIZ_EVERY_N   = 5; // páginas entre quizzes
 
@@ -1080,9 +1080,34 @@ async function openDocument(docId) {
   if (!doc) { state.view = 'library'; render(); return; }
   state.currentDoc = doc;
   try {
+    // Intentar descargar el PDF; si falla por path con caracteres especiales,
+    // usar signed URL como fallback antes de rendirse.
+    let pdfData;
     const { data: fd, error: dlE } = await state.sb.storage.from('pdfs').download(doc.storage_path);
-    if (dlE) throw dlE;
-    state.pdf = await pdfjsLib.getDocument({ data: await fd.arrayBuffer() }).promise;
+    if (dlE) {
+      const isInvalidKey = dlE.message?.toLowerCase().includes('invalid key') || dlE.statusCode === '400';
+      if (isInvalidKey) {
+        // Intento 2: signed URL (Supabase puede servirlo aunque el download directo falle)
+        const { data: signed, error: signErr } = await state.sb.storage.from('pdfs').createSignedUrl(doc.storage_path, 120);
+        if (signErr || !signed?.signedUrl) {
+          renderLibrary();
+          alert(`⚠️ No se puede abrir "${doc.title}"\n\nEl archivo fue subido con un nombre que contiene caracteres especiales (tildes, ñ, etc.) que Supabase no acepta.\n\nSolución: elimina este libro y vuélvelo a subir — el nombre se limpiará automáticamente.`);
+          return;
+        }
+        const res = await fetch(signed.signedUrl);
+        if (!res.ok) {
+          renderLibrary();
+          alert(`⚠️ No se puede abrir "${doc.title}"\n\nEl archivo fue subido con un nombre que contiene caracteres especiales (tildes, ñ, etc.) que Supabase no acepta.\n\nSolución: elimina este libro y vuélvelo a subir — el nombre se limpiará automáticamente.`);
+          return;
+        }
+        pdfData = await res.arrayBuffer();
+      } else {
+        throw dlE;
+      }
+    } else {
+      pdfData = await fd.arrayBuffer();
+    }
+    state.pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
     state.numPages = state.pdf.numPages;
 
     const { data: prog } = await state.sb.from('reading_progress').select('page').eq('document_id', docId).maybeSingle();
