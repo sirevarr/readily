@@ -521,7 +521,7 @@ function renderChat(body) {
     }
   };
 
-  // Clicks dentro de mensajes (citas clickeables, borrar, reintentar, editar)
+  // Clicks dentro de mensajes (citas clickeables, borrar, reintentar, editar, consultar web)
   msgsBox.onclick = (e) => {
     const citeEl = e.target.closest('[data-cite]');
     if (citeEl) {
@@ -538,6 +538,12 @@ function renderChat(body) {
     const editBtn = e.target.closest('[data-chat-edit]');
     if (editBtn) {
       startInlineEditMsg(editBtn.dataset.chatEdit);
+      return;
+    }
+
+    const webBtn = e.target.closest('[data-chat-web]');
+    if (webBtn) {
+      C.lookupWebInChat(webBtn.dataset.chatWeb);
       return;
     }
   };
@@ -560,6 +566,9 @@ function renderChatMessageHtml(m) {
       <div class="chat-msg-row model">
         <div class="chat-bubble model error">
           ${errorBox(m.err, 'Reintentar mensaje')}
+          <div style="margin-top:8px; text-align:center;">
+            <button class="btn ghost xsmall" data-chat-web="${esc(m.id)}">🌐 Consultar en Wikipedia / Wikcionario</button>
+          </div>
         </div>
       </div>
     `;

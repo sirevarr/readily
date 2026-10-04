@@ -1,5 +1,6 @@
 /* Readily v2 — "Explicar": solo el significado de la palabra, con definición general y de contexto.
-   Si el término ya está en el glosario o en las tarjetas, solo se lo recuerda y muestra lo guardado (sin llamar a la IA). */
+   Si el término ya está en el glosario o en las tarjetas, solo se lo recuerda y muestra lo guardado (sin llamar a la IA).
+   Soporta búsqueda web rápida (Wikipedia/Wikcionario) cuando la API no está disponible o por solicitud directa. */
 import { state, userId } from './state.js';
 import { esc, uuid, termKey, fold, ic, $, toast } from './util.js';
 import { ask, askJSON, errorBox, bindErrorBox, AIError } from './ai.js';
@@ -7,7 +8,7 @@ import { dbInsert, dbUpdate, persistGlossary, persistFlashcards } from './data.j
 import { passageAround } from './context.js';
 import { openChatWith } from './chat.js';
 import { addHighlight } from './highlights.js';
-import { STYLE_BLOCK } from './config.js';
+import { quickWebLookup } from './webSearch.js';
 
 let ex = null;
 let seq = 0;
@@ -50,7 +51,6 @@ export function findExisting(term) {
 export async function explain(raw, page, { force = false } = {}) {
   const term = cleanTerm(expandPartial(cleanTerm(raw), page));
   if (!term) return;
-  if (!state.geminiKey) { toast('Activa tu clave de Gemini en Ajustes para usar Explicar', { emoji: '🔑' }); return; }
   const passage = term.split(/\s+/).length > 6;
   ex = { term, page, kind: passage ? 'passage' : 'term', status: 'loading', tab: 'general', general: '', context: '', source: 'new', entry: null, err: null, saved: false };
   if (!passage && !force) {
@@ -59,7 +59,21 @@ export async function explain(raw, page, { force = false } = {}) {
   }
   if (force) { const f = findExisting(term); if (f) ex.entry = f.entry, ex.source = f.source; }
   render();
+
+  if (!state.geminiKey) {
+    // Si no hay clave de Gemini, consultar directamente en la web
+    await runWebLookup(term, page);
+    return;
+  }
   await generate();
+}
+
+export async function explainWeb(raw, page) {
+  const term = cleanTerm(expandPartial(cleanTerm(raw), page));
+  if (!term) return;
+  ex = { term, page, kind: 'term', status: 'loading', tab: 'general', general: '', context: '', source: 'web', entry: null, err: null, saved: false };
+  render();
+  await runWebLookup(term, page);
 }
 
 export function openStored(entry, kind = 'glossary') {
@@ -83,6 +97,32 @@ export function setVisualResult(text, err = null, retry = null) {
 }
 
 export function closePanel() { $('#explain-panel')?.remove(); ex = null; seq++; }
+
+/* ---------- Generación vía Búsqueda Web ---------- */
+async function runWebLookup(term, page) {
+  const my = ++seq;
+  if (!ex) {
+    ex = { term, page, kind: 'term', status: 'loading', tab: 'general', general: '', context: '', source: 'web', entry: null, err: null, saved: false };
+  } else {
+    ex.status = 'loading'; ex.err = null; ex.source = 'web';
+  }
+  render();
+  try {
+    const res = await quickWebLookup(term);
+    if (my !== seq) return;
+    ex.general = res.definition;
+    ex.context = res.description ? `Fuente: ${res.source} · ${res.description}` : `Fuente: ${res.source}`;
+    ex.webUrl = res.url;
+    ex.webSource = res.source;
+    ex.status = 'ready';
+    saveToGlossary(ex);
+  } catch (err) {
+    if (my !== seq) return;
+    ex.status = 'error';
+    ex.err = err;
+  }
+  render();
+}
 
 /* ---------- Generación ---------- */
 async function generate() {
@@ -137,10 +177,10 @@ function saveToGlossary(e) {
     e.entry.definition = e.general; e.entry.context_definition = e.context;
     dbUpdate('glossary', e.entry.id, { definition: e.general, context_definition: e.context });
   } else {
-    const row = { id: uuid(), document_id: state.currentDoc.id, user_id: userId(), term: e.term, definition: e.general, context_definition: e.context, level: 'simple', page: e.page, created_at: new Date().toISOString() };
+    const row = { id: uuid(), document_id: state.currentDoc?.id || null, user_id: userId(), term: e.term, definition: e.general, context_definition: e.context, level: 'simple', page: e.page, created_at: new Date().toISOString() };
     state.glossary.unshift(row);
     dbInsert('glossary', row);
-    e.entry = row; e.source = 'glossary'; e.saved = true;
+    e.entry = row; e.source = e.source === 'web' ? 'web' : 'glossary'; e.saved = true;
   }
   persistGlossary(); notifyGl();
 }
@@ -148,7 +188,7 @@ function saveToGlossary(e) {
 export function saveCardFrom(front, back) {
   const k = termKey(front);
   if (state.flashcards.some(f => termKey(f.front) === k)) return null;
-  const row = { id: uuid(), document_id: state.currentDoc.id, user_id: userId(), front, back, created_at: new Date().toISOString() };
+  const row = { id: uuid(), document_id: state.currentDoc?.id || null, user_id: userId(), front, back, created_at: new Date().toISOString() };
   state.flashcards.push(row);
   persistFlashcards(); dbInsert('flashcards', row); notifyFc();
   return row;
@@ -166,8 +206,10 @@ function render() {
   const chip = e.status === 'ready' && e.kind === 'term'
     ? (e.source === 'glossary' && !e.saved ? `<div class="ex-chip known">${ic('check', 14)} Ya la tenías en tu glosario</div>`
       : e.source === 'card' ? `<div class="ex-chip known">${ic('check', 14)} Ya está en tus tarjetas</div>`
+      : e.source === 'web' ? `<div class="ex-chip saved">${ic('check', 14)} Obtenido de ${esc(e.webSource || 'la Web')} (Guardado en Glosario)</div>`
       : e.saved ? `<div class="ex-chip saved">${ic('check', 14)} Guardada en tu glosario</div>` : '')
     : '';
+
   p.innerHTML = `
     <div class="ex-head">
       <div class="ex-title">
@@ -178,23 +220,34 @@ function render() {
     </div>
     ${hasCtx && e.status === 'ready' ? `<div class="seg" role="tablist">
       <button class="${e.tab === 'general' ? 'on' : ''}" data-tab="general">Significado</button>
-      <button class="${e.tab === 'context' ? 'on' : ''}" data-tab="context">En este libro</button>
+      <button class="${e.tab === 'context' ? 'on' : ''}" data-tab="context">En este libro / Fuente</button>
     </div>` : ''}
     <div class="ex-body">
-      ${e.status === 'loading' ? `<div class="ex-loading"><div class="spinner sm"></div><span>${e.kind === 'visual' ? 'Analizando…' : 'Buscando el significado…'}</span></div>`
-        : e.status === 'error' ? errorBox(e.err)
+      ${e.status === 'loading' ? `<div class="ex-loading"><div class="spinner sm"></div><span>${e.kind === 'visual' ? 'Analizando…' : e.source === 'web' ? 'Buscando en Wikipedia/Wikcionario…' : 'Buscando el significado…'}</span></div>`
+        : e.status === 'error' ? `
+          ${errorBox(e.err)}
+          <div style="margin-top:10px; text-align:center;">
+            <button class="btn primary small" id="ex-web-fallback">🌐 Consultar en Wikipedia / Wikcionario</button>
+          </div>
+        `
         : `<div class="ex-text">${esc(text)}</div>`}
       ${chip}
+      ${e.webUrl && e.status === 'ready' ? `<div style="margin-top:6px;"><a href="${esc(e.webUrl)}" target="_blank" rel="noopener" style="font-size:0.8rem; color:var(--accent); font-weight:500;">🔗 Ver artículo completo en ${esc(e.webSource || 'Web')}</a></div>` : ''}
     </div>
     ${e.status === 'ready' ? `<div class="ex-foot">
       ${e.kind === 'visual' ? '' : `<button class="btn small" id="ex-chat">${ic('chat', 16)} Seguir en chat</button>`}
       <button class="btn small primary" id="ex-card" ${cardExists ? 'disabled' : ''}>${e.kind === 'visual' ? `${ic('note', 16)} Guardar nota visual` : (cardExists ? `${ic('check', 16)} Ya es tarjeta` : `${ic('cards', 16)} Guardar tarjeta`)}</button>
-      ${e.kind === 'term' && e.source !== 'new' ? `<button class="btn small ghost" id="ex-regen" title="Pedir una nueva definición">${ic('refresh', 16)}</button>` : ''}
+      ${e.kind === 'term' ? `<button class="btn small ghost" id="ex-web-btn" title="Buscar en Wikipedia / Wikcionario">🌐 Consultar Web</button>` : ''}
+      ${e.kind === 'term' && e.source !== 'new' && e.source !== 'web' ? `<button class="btn small ghost" id="ex-regen" title="Pedir una nueva definición a Gemini">${ic('refresh', 16)}</button>` : ''}
     </div>` : ''}`;
 
   $('#ex-close', p).onclick = closePanel;
   p.querySelectorAll('.seg button').forEach(b => b.onclick = () => { e.tab = b.dataset.tab; render(); });
-  if (e.status === 'error') bindErrorBox(p, () => (e.kind === 'visual' && e.retry ? e.retry() : generate()), e.err);
+  if (e.status === 'error') {
+    bindErrorBox(p, () => (e.kind === 'visual' && e.retry ? e.retry() : generate()), e.err);
+    $('#ex-web-fallback', p)?.addEventListener('click', () => runWebLookup(e.term, e.page));
+  }
+  $('#ex-web-btn', p)?.addEventListener('click', () => runWebLookup(e.term, e.page));
   $('#ex-chat', p)?.addEventListener('click', () => {
     const t = e.term;
     openChatWith(`Quiero profundizar sobre "${t}" en el contexto de este libro.`, '');
@@ -208,7 +261,7 @@ function render() {
       $('#ex-card', p).disabled = true;
       return;
     }
-    const back = e.context && e.kind === 'term' ? `${e.general}\n\nEn este libro: ${e.context}` : e.general;
+    const back = e.context && e.kind === 'term' ? `${e.general}\n\n${e.context}` : e.general;
     const r = saveCardFrom(e.term, back);
     if (r) toast('Tarjeta guardada', { emoji: '🗂️' });
     render();
@@ -216,3 +269,4 @@ function render() {
 }
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#explain-panel')) closePanel(); });
+

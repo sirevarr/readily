@@ -260,3 +260,35 @@ export function handleCiteClick(citeText) {
     toast(`Cita: "${clean.slice(0, 50)}..."`, { emoji: '💬' });
   }
 }
+
+export async function lookupWebInChat(msgId) {
+  const idx = state.chatMessages.findIndex(m => m.id === msgId);
+  if (idx === -1) return;
+  const userMsg = [...state.chatMessages.slice(0, idx)].reverse().find(m => m.role === 'user');
+  if (!userMsg) return;
+
+  const query = userMsg.text.replace(/^>\s*".*?"\n\n/s, '').trim();
+  toast(`Consultando Wikipedia para "${query.slice(0, 30)}..."`, { emoji: '🌐' });
+
+  try {
+    const { quickWebLookup } = await import('./webSearch.js');
+    const res = await quickWebLookup(query);
+
+    const webMsg = {
+      id: msgId,
+      thread_id: state.currentThreadId,
+      document_id: state.currentDoc.id,
+      user_id: userId(),
+      role: 'model',
+      text: `🌐 **Consulta en ${res.source}** (${res.url ? `[Ver enlace](${res.url})` : ''}):\n\n${res.definition}${res.description ? `\n\n*${res.description}*` : ''}`,
+      modelUsed: res.source,
+      created_at: new Date().toISOString()
+    };
+    state.chatMessages[idx] = webMsg;
+    persistMessages();
+    notifyChat();
+  } catch (err) {
+    toast(`No se encontró resultado en la web: ${err.message}`, { emoji: '⚠️' });
+  }
+}
+

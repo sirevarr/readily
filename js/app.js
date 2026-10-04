@@ -395,6 +395,7 @@ function handleSelectionChanged(sel) {
     ${COLORS.map(c => `<button class="swatch-dot" data-c="${c.hex}" style="background:${c.hex}" title="${c.name}"></button>`).join('')}
     <div class="tb-divider"></div>
     <button class="btn small primary" id="sel-ex-btn">${ic('spark', 16)} Explicar</button>
+    <button class="btn small ghost" id="sel-web-btn">${ic('search', 16)} 🌐 Web</button>
     <button class="btn small ghost" id="sel-ask-btn">${ic('chat', 16)} Preguntar</button>
   `;
 
@@ -412,12 +413,17 @@ function handleSelectionChanged(sel) {
     E.explain(sel.text, p.page);
   };
 
+  $('#sel-web-btn', bar).onclick = () => {
+    const p = sel.pieces[0];
+    V.clearSelection();
+    E.explainWeb(sel.text, p.page);
+  };
+
   $('#sel-ask-btn', bar).onclick = () => {
     const cite = sel.text;
     V.clearSelection();
     E.closePanel();
-    const { openChatWith } = require('./chat.js');
-    openChatWith('', cite);
+    import('./chat.js').then(C => C.openChatWith('', cite));
   };
 }
 
