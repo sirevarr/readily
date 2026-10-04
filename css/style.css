@@ -532,7 +532,8 @@ textarea.input {
   overflow: auto;
   display: flex;
   justify-content: center;
-  padding: 24px 16px;
+  padding: 0;
+  background-color: #2B2927;
   position: relative;
 }
 
@@ -552,9 +553,48 @@ textarea.input {
 .pg {
   position: relative;
   background: #FFFFFF;
-  box-shadow: 0 10px 30px rgba(34, 32, 29, 0.15);
-  margin-bottom: 14px;
-  border-radius: 2px;
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.25);
+  margin-bottom: 16px;
+  border-radius: 3px;
+}
+
+/* Dock flotante de navegación estilo Acrobat */
+.reader-float-dock {
+  position: fixed;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(31, 29, 26, 0.92);
+  color: #F4F1EA;
+  padding: 6px 14px;
+  border-radius: 999px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 90;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.reader-float-dock.hidden {
+  opacity: 0;
+  transform: translate(-50%, 15px);
+  pointer-events: none;
+}
+.reader-float-dock .icon-btn {
+  color: #F4F1EA;
+}
+.reader-float-dock .icon-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #FFF;
+}
+.reader-float-dock .dock-page {
+  font-size: 13px;
+  font-weight: 600;
+  color: #FFF;
+  padding: 0 6px;
+  letter-spacing: 0.02em;
 }
 
 .pg-ph {

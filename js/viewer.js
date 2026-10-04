@@ -169,7 +169,7 @@ export function goTo(n, { frac = null, instant = false, rect = null } = {}) {
   else top = tops[n - 1] - gap() / 2;
   const smooth = !instant && Math.abs(n - curPage) <= 2;
   viewer.scrollTo({ top: Math.max(0, top), behavior: smooth ? 'smooth' : 'auto' });
-  if (!smooth) { setCurrent(n); }
+  setCurrent(n);
 }
 
 function setCurrent(n) {
@@ -410,11 +410,35 @@ function onTouchEnd(e) {
 function hideNativeSelection() { try { getSelection().removeAllRanges(); } catch (_) {} emit('selection', null); }
 
 function onKey(e) {
-  if (!viewer || !(e.ctrlKey || e.metaKey)) return;
-  if (e.target.closest?.('input,textarea')) return;
-  if (e.key === '+' || e.key === '=') { e.preventDefault(); stepZoom(1); }
-  else if (e.key === '-') { e.preventDefault(); stepZoom(-1); }
-  else if (e.key === '0') { e.preventDefault(); setZoomMode('fit-width'); }
+  if (!viewer) return;
+  if (e.target.closest?.('input, textarea, [contenteditable="true"]')) return;
+
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === '+' || e.key === '=') { e.preventDefault(); stepZoom(1); }
+    else if (e.key === '-') { e.preventDefault(); stepZoom(-1); }
+    else if (e.key === '0') { e.preventDefault(); setZoomMode('fit-width'); }
+    return;
+  }
+
+  if (e.key === 'PageDown' || (e.key === ' ' && !e.shiftKey)) {
+    e.preventDefault();
+    viewer.scrollBy({ top: viewer.clientHeight * 0.85, behavior: 'smooth' });
+  } else if (e.key === 'PageUp' || (e.key === ' ' && e.shiftKey)) {
+    e.preventDefault();
+    viewer.scrollBy({ top: -viewer.clientHeight * 0.85, behavior: 'smooth' });
+  } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+    e.preventDefault();
+    goTo(curPage + 1);
+  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    goTo(curPage - 1);
+  } else if (e.key === 'Home') {
+    e.preventDefault();
+    goTo(1);
+  } else if (e.key === 'End') {
+    e.preventDefault();
+    goTo(pages.length);
+  }
 }
 
 /* ============================ resaltados ============================ */

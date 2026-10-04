@@ -166,6 +166,7 @@ export async function openDocument(docId) {
   if (!doc) return;
 
   state.currentDoc = doc;
+  state.sidebarOpen = false; // El libro abre al 100% del ancho sin barra lateral estorbando
   toast(`Abriendo "${doc.title}"...`, { emoji: '📖' });
 
   try {
@@ -226,6 +227,18 @@ function renderReaderView(root) {
       <div class="reader-workspace">
         <div class="reader-stage" id="reader-stage"></div>
         <div class="reader-sidebar ${state.sidebarOpen ? 'open' : ''}" id="reader-sidebar"></div>
+        <div class="reader-float-dock" id="dock-bar">
+          <button class="icon-btn" id="dock-prev" title="Página anterior">${ic('back', 16)}</button>
+          <span class="dock-page" id="dock-page-str">${state.pageNum} / ${state.numPages}</span>
+          <button class="icon-btn" id="dock-next" title="Página siguiente">${ic('right', 16)}</button>
+          <div class="tb-divider"></div>
+          <button class="icon-btn" id="dock-zoom-out" title="Alejar">${ic('minus', 16)}</button>
+          <button class="btn ghost xsmall" id="dock-zoom-lbl" style="color:#fff; border-color:rgba(255,255,255,0.2);">100%</button>
+          <button class="icon-btn" id="dock-zoom-in" title="Acercar">${ic('plus', 16)}</button>
+          <div class="tb-divider"></div>
+          <button class="icon-btn ${state.quickHighlight ? 'active' : ''}" id="dock-pen" title="Modo Bolígrafo">${ic('pen', 16)}</button>
+          <button class="icon-btn" id="dock-sidebar" title="Notas / Chat">${ic('panel', 16)}</button>
+        </div>
       </div>
     </div>
   `;
@@ -235,6 +248,11 @@ function renderReaderView(root) {
 
   const stage = $('#reader-stage', root);
   V.mount(stage, state.pdf, state.pageNum);
+
+  const updateDockUI = () => {
+    const ps = $('#dock-page-str', root);
+    if (ps) ps.textContent = `${state.pageNum} / ${state.numPages}`;
+  };
 
   // Escuchar eventos del visor PDF
   V.on('page', (num) => {
@@ -246,6 +264,12 @@ function renderReaderView(root) {
     saveProgress(state.currentDoc.id, state.pageNum, state.maxPage);
     Q.checkQuizTrigger(prev, num);
     updatePageInputUI();
+    updateDockUI();
+  });
+
+  V.on('scale', (scale, mode) => {
+    const lbl = $('#dock-zoom-lbl', root);
+    if (lbl) lbl.textContent = mode === 'fit-width' ? 'Ancho' : mode === 'fit-page' ? 'Pág' : `${Math.round(scale * 100)}%`;
   });
 
   V.on('selection', (sel) => {
@@ -256,9 +280,29 @@ function renderReaderView(root) {
     E.openStored({ term: hl.text, definition: hl.note || 'Subrayado', page: hl.page }, 'glossary');
   });
 
+  // Eventos del Dock Flotante estilo Acrobat
+  $('#dock-prev', root).onclick = () => V.goTo(state.pageNum - 1);
+  $('#dock-next', root).onclick = () => V.goTo(state.pageNum + 1);
+  $('#dock-zoom-out', root).onclick = () => V.stepZoom(-1);
+  $('#dock-zoom-in', root).onclick = () => V.stepZoom(1);
+  $('#dock-zoom-lbl', root).onclick = openZoomMenu;
+  $('#dock-pen', root).onclick = () => {
+    state.quickHighlight = !state.quickHighlight;
+    $('#dock-pen', root).classList.toggle('active', state.quickHighlight);
+    $('#tb-quick-hl')?.classList.toggle('active', state.quickHighlight);
+    toast(state.quickHighlight ? 'Modo Bolígrafo activado' : 'Modo Bolígrafo desactivado', { emoji: '✏️' });
+  };
+  $('#dock-sidebar', root).onclick = () => {
+    state.sidebarOpen = !state.sidebarOpen;
+    document.dispatchEvent(new CustomEvent('readily:sidebarToggle'));
+  };
+
   document.addEventListener('readily:sidebarToggle', () => {
     const sb = $('#reader-sidebar', root);
     if (sb) sb.classList.toggle('open', state.sidebarOpen);
+    setTimeout(() => {
+      if (V.getZoomMode() === 'fit-width') V.setZoomMode('fit-width');
+    }, 280);
   });
 }
 
