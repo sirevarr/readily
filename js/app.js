@@ -61,7 +61,7 @@ function renderConnect(root) {
         <h1 class="auth-logo">Readily</h1>
         <p class="auth-tagline">Tu lector personal de PDFs con IA</p>
         <h2>Conecta tu base de datos</h2>
-        <p class="auth-hint">Pega los datos de tu proyecto Supabase. Se guardarán únicamente en tu navegador.</p>
+        <p class="auth-hint">Pega los datos de tu proyecto Supabase o continúa en modo local sin servidor.</p>
         <div class="field">
           <label>URL del Proyecto</label>
           <input id="sb-url" class="input" placeholder="https://xxxx.supabase.co" value="${esc(localStorage.getItem(LS.sbUrl) || '')}">
@@ -71,6 +71,7 @@ function renderConnect(root) {
           <input id="sb-key" class="input" placeholder="eyJhbGci..." value="${esc(localStorage.getItem(LS.sbKey) || '')}">
         </div>
         <button class="btn primary full" id="conn-btn">Conectar y Continuar</button>
+        <button class="btn ghost full" id="local-btn" style="margin-top:8px;">📂 Usar Modo Local (Sin Supabase)</button>
       </div>
     </div>
   `;
@@ -95,6 +96,14 @@ function renderConnect(root) {
     }
     render();
   };
+
+  $('#local-btn', root).onclick = async () => {
+    state.session = { user: { id: 'local-user', email: 'local@device' } };
+    state.view = 'library';
+    await loadDays();
+    await loadDocuments();
+    render();
+  };
 }
 
 /* ==================== 2. AUTENTICACIÓN ==================== */
@@ -115,7 +124,8 @@ function renderAuth(root) {
           <input id="auth-pass" class="input" type="password" placeholder="••••••••">
         </div>
         <button class="btn primary full" id="auth-btn">${isLogin ? 'Entrar' : 'Registrarse'}</button>
-        <button class="btn ghost full" id="auth-switch" style="margin-top:8px">
+        <button class="btn ghost full" id="local-mode-btn" style="margin-top:8px">📂 Modo Local (Sin cuenta)</button>
+        <button class="btn ghost full" id="auth-switch" style="margin-top:4px">
           ${isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia sesión'}
         </button>
       </div>
@@ -125,6 +135,14 @@ function renderAuth(root) {
   $('#auth-switch', root).onclick = () => {
     state.authMode = isLogin ? 'signup' : 'login';
     renderAuth(root);
+  };
+
+  $('#local-mode-btn', root).onclick = async () => {
+    state.session = { user: { id: 'local-user', email: 'local@device' } };
+    state.view = 'library';
+    await loadDays();
+    await loadDocuments();
+    render();
   };
 
   $('#auth-btn', root).onclick = async () => {
@@ -173,7 +191,18 @@ export async function openDocument(docId) {
   toast(`Abriendo "${doc.title}"...`, { emoji: '📖' });
 
   try {
-    const buf = await getPdfBytes(doc, { onStatus: msg => toast(msg, { emoji: '⏳' }) });
+    let buf;
+    try {
+      buf = await getPdfBytes(doc, { onStatus: msg => toast(msg, { emoji: '⏳' }) });
+    } catch (dlErr) {
+      buf = await promptLocalPdfFallback(doc, dlErr.message);
+      if (!buf) {
+        state.view = 'library';
+        render();
+        return;
+      }
+    }
+
     state.pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
     state.numPages = state.pdf.numPages;
 
@@ -204,6 +233,47 @@ export async function openDocument(docId) {
     state.view = 'library';
     render();
   }
+}
+
+async function promptLocalPdfFallback(doc, errorMsg) {
+  return new Promise((resolve) => {
+    const m = openModal(`
+      <div class="modal-title" style="color:var(--warn);">⚠️ No se pudo descargar el PDF remoto</div>
+      <p style="font-size:13px; color:var(--ink-soft); line-height:1.5; margin-bottom:14px;">
+        ${esc(errorMsg)}
+      </p>
+      <p style="font-size:13px; font-weight:600; margin-bottom:12px;">
+        Selecciona el archivo PDF de <strong>"${esc(doc.title)}"</strong> desde tu equipo para abrirlo y guardarlo:
+      </p>
+      <div class="field">
+        <input type="file" id="fallback-pdf-file" accept="application/pdf" class="input">
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="fb-cancel">Cancelar</button>
+        <button class="btn primary" id="fb-confirm">Cargar y Abrir</button>
+      </div>
+    `);
+
+    $('#fb-cancel', m.el).onclick = () => { m.close(); resolve(null); };
+    $('#fb-confirm', m.el).onclick = async () => {
+      const fileInp = $('#fallback-pdf-file', m.el);
+      const file = fileInp?.files?.[0];
+      if (!file) { toast('Selecciona un archivo PDF', { emoji: '⚠️' }); return; }
+      try {
+        const buf = await file.arrayBuffer();
+        const { idb } = await import('./idb.js');
+        await idb.set(doc.storage_path, buf.slice(0), 'blobs');
+        state.offlineDocs.add(doc.storage_path);
+        toast('PDF guardado en el dispositivo', { emoji: '✅' });
+        m.close();
+        resolve(buf);
+      } catch (e) {
+        toast(`Error al leer archivo: ${e.message}`, { emoji: '⚠️' });
+        m.close();
+        resolve(null);
+      }
+    };
+  });
 }
 
 async function extractIndexInBackground() {
