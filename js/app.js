@@ -29,36 +29,19 @@ export async function initApp(rootElement) {
       const session = await getSessionSafe();
       if (session) {
         state.session = session;
-        state.view = 'library';
-        await loadDays();
-        await loadDocuments();
       } else {
-        await loadDays();
-        await loadDocuments();
-        if (state.documents.length) {
-          state.session = { user: { id: 'local-user', email: 'local@device' } };
-          state.view = 'library';
-        } else {
-          state.view = 'auth';
-        }
+        state.session = { user: { id: 'local-user', email: 'local@device' } };
       }
     } catch (_) {
       state.session = { user: { id: 'local-user', email: 'local@device' } };
-      state.view = 'library';
-      await loadDays();
-      await loadDocuments();
     }
   } else {
-    await loadDays();
-    await loadDocuments();
-    if (state.documents.length) {
-      state.session = { user: { id: 'local-user', email: 'local@device' } };
-      state.view = 'library';
-    } else {
-      state.view = 'connect';
-    }
+    state.session = { user: { id: 'local-user', email: 'local@device' } };
   }
 
+  state.view = 'library';
+  await loadDays();
+  await loadDocuments();
   render();
 }
 
