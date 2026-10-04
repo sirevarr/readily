@@ -75,9 +75,25 @@ export function renderLibrary(container) {
     const doc = state.documents.find(d => d.id === docId);
     if (!doc) return;
 
+    const openBtn = card.querySelector('.doc-act-open');
+    const triggerOpen = () => {
+      if (openBtn) {
+        openBtn.disabled = true;
+        openBtn.innerHTML = `<div class="spinner sm" style="width:12px;height:12px;border-width:2px;"></div> Abriendo...`;
+      }
+      openDocument(docId);
+    };
+
+    if (openBtn) {
+      openBtn.onclick = (e) => {
+        e.stopPropagation();
+        triggerOpen();
+      };
+    }
+
     card.onclick = (e) => {
       if (e.target.closest('button')) return;
-      openDocument(docId);
+      triggerOpen();
     };
 
     const editBtn = card.querySelector('.doc-act-edit');
