@@ -25,17 +25,38 @@ export async function initApp(rootElement) {
 
   if (url && key) {
     createClient(url, key);
-    const session = await getSessionSafe();
-    if (session) {
-      state.session = session;
+    try {
+      const session = await getSessionSafe();
+      if (session) {
+        state.session = session;
+        state.view = 'library';
+        await loadDays();
+        await loadDocuments();
+      } else {
+        await loadDays();
+        await loadDocuments();
+        if (state.documents.length) {
+          state.session = { user: { id: 'local-user', email: 'local@device' } };
+          state.view = 'library';
+        } else {
+          state.view = 'auth';
+        }
+      }
+    } catch (_) {
+      state.session = { user: { id: 'local-user', email: 'local@device' } };
       state.view = 'library';
       await loadDays();
       await loadDocuments();
-    } else {
-      state.view = 'auth';
     }
   } else {
-    state.view = 'connect';
+    await loadDays();
+    await loadDocuments();
+    if (state.documents.length) {
+      state.session = { user: { id: 'local-user', email: 'local@device' } };
+      state.view = 'library';
+    } else {
+      state.view = 'connect';
+    }
   }
 
   render();
@@ -71,7 +92,7 @@ function renderConnect(root) {
           <input id="sb-key" class="input" placeholder="eyJhbGci..." value="${esc(localStorage.getItem(LS.sbKey) || '')}">
         </div>
         <button class="btn primary full" id="conn-btn">Conectar y Continuar</button>
-        <button class="btn ghost full" id="local-btn" style="margin-top:8px;">📂 Usar Modo Local (Sin Supabase)</button>
+        <button class="btn ghost full" id="local-btn" style="margin-top:10px; background:var(--accent-soft); color:var(--accent); font-weight:600;">📂 Entrar en Modo Lectura Local</button>
       </div>
     </div>
   `;
@@ -114,7 +135,7 @@ function renderAuth(root) {
       <div class="auth-card">
         <h1 class="auth-logo">Readily</h1>
         <h2>${isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}</h2>
-        <p class="auth-hint">Accede a tu biblioteca de PDFs y anotaciones sincronizadas.</p>
+        <p class="auth-hint">Accede a tu biblioteca de PDFs y anotaciones.</p>
         <div class="field">
           <label>Correo Electrónico</label>
           <input id="auth-email" class="input" type="email" placeholder="tu@correo.com">
@@ -124,8 +145,8 @@ function renderAuth(root) {
           <input id="auth-pass" class="input" type="password" placeholder="••••••••">
         </div>
         <button class="btn primary full" id="auth-btn">${isLogin ? 'Entrar' : 'Registrarse'}</button>
-        <button class="btn ghost full" id="local-mode-btn" style="margin-top:8px">📂 Modo Local (Sin cuenta)</button>
-        <button class="btn ghost full" id="auth-switch" style="margin-top:4px">
+        <button class="btn ghost full" id="local-mode-btn" style="margin-top:10px; background:var(--accent-soft); color:var(--accent); font-weight:600;">📂 Entrar en Modo Lectura Local</button>
+        <button class="btn ghost full" id="auth-switch" style="margin-top:6px">
           ${isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia sesión'}
         </button>
       </div>
@@ -150,26 +171,32 @@ function renderAuth(root) {
     const password = $('#auth-pass', root).value;
     if (!email || !password) { toast('Introduce correo y contraseña', { emoji: '⚠️' }); return; }
 
-    const method = isLogin ? 'signInWithPassword' : 'signUp';
-    const { data, error } = await state.sb.auth[method]({ email, password });
+    try {
+      const method = isLogin ? 'signInWithPassword' : 'signUp';
+      const { data, error } = await state.sb.auth[method]({ email, password });
 
-    if (error) {
-      toast(error.message, { emoji: '⚠️' });
-      return;
+      if (error) throw error;
+
+      if (!isLogin && !data.session) {
+        toast('Cuenta creada. Por favor, confirma tu correo.', { emoji: '📧' });
+        state.authMode = 'login';
+        renderAuth(root);
+        return;
+      }
+
+      state.session = data.session;
+      state.view = 'library';
+      await loadDays();
+      await loadDocuments();
+      render();
+    } catch (err) {
+      toast(`No se pudo autenticar: ${err.message}. Entrando en Modo Lectura Local.`, { emoji: '⚠️', duration: 4000 });
+      state.session = { user: { id: 'local-user', email: 'local@device' } };
+      state.view = 'library';
+      await loadDays();
+      await loadDocuments();
+      render();
     }
-
-    if (!isLogin && !data.session) {
-      toast('Cuenta creada. Por favor, confirma tu correo.', { emoji: '📧' });
-      state.authMode = 'login';
-      renderAuth(root);
-      return;
-    }
-
-    state.session = data.session;
-    state.view = 'library';
-    await loadDays();
-    await loadDocuments();
-    render();
   };
 }
 
