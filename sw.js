@@ -1,14 +1,18 @@
-/* Readily — Service Worker */
-const CACHE_NAME = 'readily-v1';
+/* Readily v2 — Service Worker con soporte offline completo */
+const CACHE_NAME = 'readily-v2';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
+  '/proyecto.html',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
+  '/css/style.css',
+  '/vendor/supabase.js',
+  '/vendor/pdf.min.js',
+  '/vendor/pdf.worker.min.js'
 ];
 
-// Install: cache the app shell
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL_ASSETS))
@@ -16,7 +20,6 @@ self.addEventListener('install', event => {
   self.skipWaiting();
 });
 
-// Activate: clean up old caches
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -26,16 +29,15 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// Fetch: network-first for HTML, cache-first for local assets
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Let external CDN/API requests go straight to network
+  // Permitir que peticiones a Supabase / Gemini externas vayan directo a la red
   if (url.origin !== self.location.origin) {
     return;
   }
 
-  // For navigation requests (HTML), try network first, fall back to cached shell
+  // Navegación HTML: intentar red primero, fallback a caché
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
@@ -44,18 +46,20 @@ self.addEventListener('fetch', event => {
           caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
           return res;
         })
-        .catch(() => caches.match('/index.html'))
+        .catch(() => caches.match(url.pathname) || caches.match('/proyecto.html') || caches.match('/index.html'))
     );
     return;
   }
 
-  // For local static assets, cache-first
+  // Recursos estáticos locales (JS, CSS, vendor, imágenes): cache-first con revalidación
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
       return fetch(event.request).then(res => {
-        const clone = res.clone();
-        caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+        }
         return res;
       });
     })

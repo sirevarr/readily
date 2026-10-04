@@ -80,13 +80,14 @@ CREATE POLICY "own messages" ON chat_messages USING (auth.uid() = user_id);
 
 ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS thread_id uuid REFERENCES chat_threads(id) ON DELETE CASCADE;
 
--- ---- 7. Tabla de glosario (NUEVO) ----
+-- ---- 7. Tabla de glosario ----
 CREATE TABLE IF NOT EXISTS glossary (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   document_id uuid REFERENCES documents(id) ON DELETE CASCADE,
   user_id uuid,
   term text NOT NULL,
   definition text NOT NULL,
+  context_definition text DEFAULT '',
   level text DEFAULT 'intermedio' CHECK (level IN ('simple','intermedio','tecnico')),
   page int,
   created_at timestamptz DEFAULT now()
@@ -94,8 +95,42 @@ CREATE TABLE IF NOT EXISTS glossary (
 ALTER TABLE glossary ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "own glossary" ON glossary;
 CREATE POLICY "own glossary" ON glossary USING (auth.uid() = user_id);
+ALTER TABLE glossary ADD COLUMN IF NOT EXISTS context_definition text DEFAULT '';
 
--- ---- 8. Storage bucket (ejecutar si no existe) ----
+-- ---- 8. Tabla de racha diaria (NUEVO v2) ----
+CREATE TABLE IF NOT EXISTS reading_days (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  day text NOT NULL, -- formato 'YYYY-MM-DD'
+  pages int DEFAULT 1,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(user_id, day)
+);
+ALTER TABLE reading_days ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "own reading_days" ON reading_days;
+CREATE POLICY "own reading_days" ON reading_days USING (auth.uid() = user_id);
+
+-- ---- 9. Tabla de intentos de quiz (NUEVO v2) ----
+CREATE TABLE IF NOT EXISTS quiz_attempts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  document_id uuid REFERENCES documents(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  from_page int NOT NULL,
+  to_page int NOT NULL,
+  question text NOT NULL,
+  answer text NOT NULL,
+  feedback text DEFAULT '',
+  score int DEFAULT 100,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE quiz_attempts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "own quiz_attempts" ON quiz_attempts;
+CREATE POLICY "own quiz_attempts" ON quiz_attempts USING (auth.uid() = user_id);
+
+-- Alteraciones adicionales de compatibilidad
+ALTER TABLE reading_progress ADD COLUMN IF NOT EXISTS max_page int DEFAULT 1;
+
+-- ---- 10. Storage bucket (ejecutar si no existe) ----
 -- Nota: esto puede fallar si ya existe — es normal
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('pdfs', 'pdfs', false)
@@ -111,3 +146,4 @@ CREATE POLICY "download pdfs" ON storage.objects
   FOR SELECT USING (bucket_id = 'pdfs' AND auth.uid()::text = (storage.foldername(name))[1]);
 CREATE POLICY "delete pdfs" ON storage.objects
   FOR DELETE USING (bucket_id = 'pdfs' AND auth.uid()::text = (storage.foldername(name))[1]);
+
