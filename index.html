@@ -12,8 +12,28 @@
   <meta name="apple-mobile-web-app-title" content="Readily">
   <link rel="apple-touch-icon" href="icon-192.png">
 
+  <!-- Limpieza automática de la caché vieja de Service Worker (v1) -->
+  <script>
+    (async function purgeStaleCaches() {
+      try {
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          for (const r of regs) {
+            await r.unregister();
+          }
+        }
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          for (const k of keys) {
+            await caches.delete(k);
+          }
+        }
+      } catch (_) {}
+    })();
+  </script>
+
   <!-- Estilos de Readily v2 -->
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=2.2">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -27,18 +47,15 @@
   <script src="vendor/pdf.min.js"></script>
 
   <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
-    }
     // Configurar worker local de pdf.js
     if (window.pdfjsLib) {
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
     }
   </script>
 
-  <!-- Módulo de la aplicación v2 -->
+  <!-- Módulo de la aplicación v2 con sello de versión -->
   <script type="module">
-    import { initApp } from './js/app.js';
+    import { initApp } from './js/app.js?v=2.2';
     window.addEventListener('DOMContentLoaded', () => {
       initApp(document.getElementById('app-root'));
     });

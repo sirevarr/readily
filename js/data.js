@@ -193,19 +193,27 @@ export async function saveProgress(docId, page, maxPage) {
 
 /* ---------- PDFs guardados en el dispositivo ---------- */
 export async function getPdfBytes(doc, { onStatus } = {}) {
+  if (!doc || !doc.storage_path) throw new Error('El libro no contiene una ruta de archivo válida.');
   const cached = await idb.get(doc.storage_path, 'blobs');
   if (cached) { onStatus?.('Desde tu dispositivo…'); return cached.slice(0); }
   if (!navigator.onLine) throw new Error('Este libro todavía no está guardado en el dispositivo y no hay conexión.');
   onStatus?.('Descargando…');
   let buf;
-  const { data: fd, error: dlE } = await state.sb.storage.from('pdfs').download(doc.storage_path);
-  if (dlE) {
-    const { data: signed, error: signErr } = await state.sb.storage.from('pdfs').createSignedUrl(doc.storage_path, 300);
-    if (signErr || !signed?.signedUrl) throw new Error(`No se pudo descargar "${doc.title}". Si el nombre del archivo tenía tildes o ñ, elimínalo y vuelve a subirlo.`);
-    const res = await fetch(signed.signedUrl);
-    if (!res.ok) throw new Error(`No se pudo descargar "${doc.title}".`);
-    buf = await res.arrayBuffer();
-  } else buf = await fd.arrayBuffer();
+  try {
+    const { data: fd, error: dlE } = await state.sb.storage.from('pdfs').download(doc.storage_path);
+    if (dlE) throw dlE;
+    buf = await fd.arrayBuffer();
+  } catch (_) {
+    try {
+      const { data: signed, error: signErr } = await state.sb.storage.from('pdfs').createSignedUrl(doc.storage_path, 300);
+      if (signErr || !signed?.signedUrl) throw signErr || new Error('URL firmada no disponible');
+      const res = await fetch(signed.signedUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      buf = await res.arrayBuffer();
+    } catch (_) {
+      throw new Error(`No se pudo descargar "${doc.title}". El archivo no fue encontrado en Supabase Storage. Puedes volver a subirlo usando "+ Subir PDF".`);
+    }
+  }
   await idb.set(doc.storage_path, buf.slice(0), 'blobs');
   state.offlineDocs.add(doc.storage_path);
   return buf;
