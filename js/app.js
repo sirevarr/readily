@@ -162,8 +162,11 @@ function renderLibraryView(root) {
 
 /* ==================== 4. LECTOR DE PDF CONTINUO ==================== */
 export async function openDocument(docId) {
-  const doc = state.documents.find(d => d.id === docId);
-  if (!doc) return;
+  const doc = state.documents.find(d => String(d.id) === String(docId));
+  if (!doc) {
+    toast('No se encontró el documento especificado.', { emoji: '⚠️' });
+    return;
+  }
 
   state.currentDoc = doc;
   state.sidebarOpen = false; // El libro abre al 100% del ancho sin barra lateral estorbando
@@ -171,12 +174,14 @@ export async function openDocument(docId) {
 
   try {
     const buf = await getPdfBytes(doc, { onStatus: msg => toast(msg, { emoji: '⏳' }) });
-    state.pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    state.pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
     state.numPages = state.pdf.numPages;
 
-    await loadDocCollections(docId);
+    if (state.sb) {
+      try { await loadDocCollections(doc.id); } catch (_) {}
+    }
 
-    const prog = state.docProgresses[docId];
+    const prog = state.docProgresses[doc.id];
     state.pageNum = prog?.page || 1;
     state.maxPage = prog?.max_page || state.pageNum;
 
@@ -194,7 +199,8 @@ export async function openDocument(docId) {
       showResumeBanner(doc, state.pageNum);
     }
   } catch (err) {
-    toast(`Error al abrir: ${err.message}`, { emoji: '⚠️' });
+    console.error('Error al abrir documento:', err);
+    toast(`No se pudo abrir: ${err.message}`, { emoji: '⚠️', duration: 4000 });
     state.view = 'library';
     render();
   }

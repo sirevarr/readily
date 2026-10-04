@@ -165,12 +165,19 @@ export function installSyncListeners() {
 
 /* ---------- Biblioteca ---------- */
 export async function loadDocuments() {
-  await flushBeforeLoad();
-  const docs = await fetchCached(ck('docs'), () => state.sb.from('documents').select('*').order('created_at', { ascending: false }));
-  state.documents = docs || [];
+  if (state.sb) {
+    await flushBeforeLoad();
+    const docs = await fetchCached(ck('docs'), () => state.sb.from('documents').select('*').order('created_at', { ascending: false }));
+    state.documents = docs || [];
+  } else {
+    state.documents = (await idb.get(ck('docs'))) || [];
+  }
   const ids = state.documents.map(d => d.id);
   let progs = [];
-  if (ids.length) progs = await fetchCached(ck('prog'), () => state.sb.from('reading_progress').select('*').in('document_id', ids));
+  if (ids.length) {
+    if (state.sb) progs = await fetchCached(ck('prog'), () => state.sb.from('reading_progress').select('*').in('document_id', ids));
+    else progs = (await idb.get(ck('prog'))) || [];
+  }
   state.docProgresses = {};
   (progs || []).forEach(p => { state.docProgresses[p.document_id] = { page: p.page, max_page: p.max_page || p.page, updated_at: p.updated_at }; });
   await refreshOfflineSet();
@@ -196,7 +203,7 @@ export async function getPdfBytes(doc, { onStatus } = {}) {
   if (!doc || !doc.storage_path) throw new Error('El libro no contiene una ruta de archivo válida.');
   const cached = await idb.get(doc.storage_path, 'blobs');
   if (cached) { onStatus?.('Desde tu dispositivo…'); return cached.slice(0); }
-  if (!navigator.onLine) throw new Error('Este libro todavía no está guardado en el dispositivo y no hay conexión.');
+  if (!state.sb || !navigator.onLine) throw new Error('Este libro todavía no está guardado en el dispositivo para leer offline.');
   onStatus?.('Descargando…');
   let buf;
   try {
@@ -211,7 +218,7 @@ export async function getPdfBytes(doc, { onStatus } = {}) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       buf = await res.arrayBuffer();
     } catch (_) {
-      throw new Error(`No se pudo descargar "${doc.title}". El archivo no fue encontrado en Supabase Storage. Puedes volver a subirlo usando "+ Subir PDF".`);
+      throw new Error(`No se pudo descargar "${doc.title}". El archivo no fue encontrado en Supabase Storage.`);
     }
   }
   await idb.set(doc.storage_path, buf.slice(0), 'blobs');
