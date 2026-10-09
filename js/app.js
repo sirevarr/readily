@@ -208,11 +208,13 @@ export async function openDocument(docId) {
   const doc = state.documents.find(d => String(d.id) === String(docId));
   if (!doc) {
     toast('No se encontró el documento especificado.', { emoji: '⚠️' });
+    state.view = 'library';
+    render();
     return;
   }
 
   state.currentDoc = doc;
-  state.sidebarOpen = false; // El libro abre al 100% del ancho sin barra lateral estorbando
+  state.sidebarOpen = false;
   toast(`Abriendo "${doc.title}"...`, { emoji: '📖' });
 
   try {
@@ -229,16 +231,27 @@ export async function openDocument(docId) {
     }
 
     const bytes = buf instanceof Uint8Array ? buf : (buf?.buffer ? new Uint8Array(buf.buffer, buf.byteOffset || 0, buf.byteLength || buf.buffer.byteLength) : new Uint8Array(buf));
+    
+    // Parseo de PDF con timeout de 3.5s para el worker. Si se cuelga, pasa inmediatamente a main thread.
     try {
-      state.pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+      const task = pdfjsLib.getDocument({ data: bytes });
+      state.pdf = await Promise.race([
+        task.promise,
+        new Promise((_, reject) => setTimeout(() => { try { task.destroy(); } catch (_) {} reject(new Error('worker_timeout')); }, 3500))
+      ]);
     } catch (wErr) {
-      console.warn('[pdf] fallback a modo sin worker:', wErr);
+      console.warn('[pdf] fallback instantáneo a modo sin worker:', wErr);
       state.pdf = await pdfjsLib.getDocument({ data: bytes, disableWorker: true }).promise;
     }
     state.numPages = state.pdf.numPages;
 
     if (state.sb) {
-      try { await loadDocCollections(doc.id); } catch (_) {}
+      try {
+        await Promise.race([
+          loadDocCollections(doc.id),
+          new Promise(r => setTimeout(r, 2500))
+        ]);
+      } catch (_) {}
     }
 
     const prog = state.docProgresses[doc.id];

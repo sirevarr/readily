@@ -78,12 +78,19 @@ export function renderLibrary(container) {
     if (!doc) return;
 
     const openBtn = card.querySelector('.doc-act-open');
-    const triggerOpen = () => {
+    const triggerOpen = async () => {
       if (openBtn) {
         openBtn.disabled = true;
         openBtn.innerHTML = `<div class="spinner sm" style="width:12px;height:12px;border-width:2px;"></div> Abriendo...`;
       }
-      openDocument(docId);
+      try {
+        await openDocument(docId);
+      } finally {
+        if (openBtn && state.view === 'library') {
+          openBtn.disabled = false;
+          openBtn.innerHTML = `Abrir ${ic('right', 14)}`;
+        }
+      }
     };
 
     if (openBtn) {

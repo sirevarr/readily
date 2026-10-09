@@ -199,6 +199,13 @@ export async function saveProgress(docId, page, maxPage) {
 }
 
 /* ---------- PDFs guardados en el dispositivo ---------- */
+function withTimeout(promise, ms = 6000, errorMsg = 'Tiempo de espera agotado') {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(errorMsg)), ms))
+  ]);
+}
+
 export async function getPdfBytes(doc, { onStatus } = {}) {
   if (!doc || !doc.storage_path) throw new Error('El libro no contiene una ruta de archivo válida.');
   const cached = await idb.get(doc.storage_path, 'blobs');
@@ -216,21 +223,21 @@ export async function getPdfBytes(doc, { onStatus } = {}) {
   onStatus?.('Descargando…');
   let buf;
   try {
-    const { data: fd, error: dlE } = await state.sb.storage.from('pdfs').download(doc.storage_path);
+    const { data: fd, error: dlE } = await withTimeout(state.sb.storage.from('pdfs').download(doc.storage_path), 6000, 'Descarga remota atascada');
     if (dlE) throw dlE;
     buf = await fd.arrayBuffer();
   } catch (_) {
     try {
-      const { data: signed, error: signErr } = await state.sb.storage.from('pdfs').createSignedUrl(doc.storage_path, 300);
+      const { data: signed, error: signErr } = await withTimeout(state.sb.storage.from('pdfs').createSignedUrl(doc.storage_path, 300), 4000);
       if (signErr || !signed?.signedUrl) throw signErr || new Error('URL firmada no disponible');
-      const res = await fetch(signed.signedUrl);
+      const res = await withTimeout(fetch(signed.signedUrl), 6000);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       buf = await res.arrayBuffer();
     } catch (_2) {
       try {
         const { data: pub } = state.sb.storage.from('pdfs').getPublicUrl(doc.storage_path);
         if (!pub?.publicUrl) throw new Error('URL pública no disponible');
-        const res = await fetch(pub.publicUrl);
+        const res = await withTimeout(fetch(pub.publicUrl), 6000);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         buf = await res.arrayBuffer();
       } catch (_3) {
