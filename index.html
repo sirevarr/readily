@@ -12,22 +12,21 @@
   <meta name="apple-mobile-web-app-title" content="Readily">
   <link rel="apple-touch-icon" href="icon-192.png">
 
-  <!-- Limpieza automática de la caché vieja de Service Worker (v1) -->
+  <!-- Limpieza ÚNICA de la caché vieja de la v1 (no se repite, para no romper el modo offline) -->
   <script>
-    (async function purgeStaleCaches() {
+    (async function purgeStaleCachesOnce() {
       try {
+        if (localStorage.getItem('readily_v2_purged')) return;
+        localStorage.setItem('readily_v2_purged', '1');
         if ('serviceWorker' in navigator) {
           const regs = await navigator.serviceWorker.getRegistrations();
-          for (const r of regs) {
-            await r.unregister();
-          }
+          for (const r of regs) await r.unregister();
         }
         if ('caches' in window) {
           const keys = await caches.keys();
-          for (const k of keys) {
-            await caches.delete(k);
-          }
+          for (const k of keys) await caches.delete(k);
         }
+        location.reload();
       } catch (_) {}
     })();
   </script>
@@ -47,6 +46,9 @@
   <script src="vendor/pdf.min.js"></script>
 
   <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    }
     // Configurar worker local de pdf.js
     if (window.pdfjsLib) {
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
