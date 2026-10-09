@@ -232,24 +232,47 @@ export async function openDocument(docId) {
 
     const bytes = buf instanceof Uint8Array ? buf : (buf?.buffer ? new Uint8Array(buf.buffer, buf.byteOffset || 0, buf.byteLength || buf.buffer.byteLength) : new Uint8Array(buf));
     
-    // Parseo de PDF con timeout de 3.5s para el worker. Si se cuelga, pasa inmediatamente a main thread.
+    if (!bytes || bytes.byteLength < 100) {
+      toast('El archivo PDF no tiene datos válidos.', { emoji: '⚠️' });
+      state.view = 'library';
+      render();
+      return;
+    }
+
+    let pdfObj = null;
+    let pdfTask = null;
     try {
-      const task = pdfjsLib.getDocument({ data: bytes });
-      state.pdf = await Promise.race([
-        task.promise,
-        new Promise((_, reject) => setTimeout(() => { try { task.destroy(); } catch (_) {} reject(new Error('worker_timeout')); }, 3500))
+      pdfTask = pdfjsLib.getDocument({ data: bytes });
+      pdfObj = await Promise.race([
+        pdfTask.promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('worker_timeout')), 3000))
       ]);
     } catch (wErr) {
-      console.warn('[pdf] fallback instantáneo a modo sin worker:', wErr);
-      state.pdf = await pdfjsLib.getDocument({ data: bytes, disableWorker: true }).promise;
+      console.warn('[pdf] fallback a modo sin worker:', wErr);
+      try { if (pdfTask?.destroy) pdfTask.destroy(); } catch (_) {}
+      try {
+        const syncTask = pdfjsLib.getDocument({ data: bytes, disableWorker: true });
+        pdfObj = await Promise.race([
+          syncTask.promise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('no_sync_parse')), 3500))
+        ]);
+      } catch (parseErr) {
+        console.error('[pdf] error crítico leyendo PDF:', parseErr);
+        toast(`No se pudo interpretar el PDF "${doc.title}". El archivo puede estar corrupto.`, { emoji: '⚠️', duration: 4000 });
+        state.view = 'library';
+        render();
+        return;
+      }
     }
+
+    state.pdf = pdfObj;
     state.numPages = state.pdf.numPages;
 
     if (state.sb) {
       try {
         await Promise.race([
           loadDocCollections(doc.id),
-          new Promise(r => setTimeout(r, 2500))
+          new Promise(r => setTimeout(r, 2000))
         ]);
       } catch (_) {}
     }
