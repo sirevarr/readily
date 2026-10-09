@@ -7,15 +7,22 @@ function open() {
   if (dbp) return dbp;
   dbp = new Promise((resolve, reject) => {
     if (!('indexedDB' in window)) return reject(new Error('IndexedDB no disponible'));
-    const r = indexedDB.open(DB_NAME, 1);
-    r.onupgradeneeded = () => {
-      const d = r.result;
-      d.createObjectStore('kv');
-      d.createObjectStore('blobs');
-      d.createObjectStore('outbox', { keyPath: 'seq', autoIncrement: true });
-    };
-    r.onsuccess = () => resolve(r.result);
-    r.onerror = () => reject(r.error);
+    const timer = setTimeout(() => reject(new Error('IndexedDB timeout')), 2000);
+    try {
+      const r = indexedDB.open(DB_NAME, 1);
+      r.onupgradeneeded = () => {
+        const d = r.result;
+        if (!d.objectStoreNames.contains('kv')) d.createObjectStore('kv');
+        if (!d.objectStoreNames.contains('blobs')) d.createObjectStore('blobs');
+        if (!d.objectStoreNames.contains('outbox')) d.createObjectStore('outbox', { keyPath: 'seq', autoIncrement: true });
+      };
+      r.onsuccess = () => { clearTimeout(timer); resolve(r.result); };
+      r.onerror = () => { clearTimeout(timer); reject(r.error); };
+      r.onblocked = () => { clearTimeout(timer); reject(new Error('IndexedDB bloqueada')); };
+    } catch (e) {
+      clearTimeout(timer);
+      reject(e);
+    }
   });
   return dbp;
 }

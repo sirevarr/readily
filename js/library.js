@@ -17,7 +17,7 @@ export function renderLibrary(container) {
     <div class="lib-container">
       <header class="lib-header">
         <div class="lib-brand">
-          <h1 class="lib-title">Readily</h1>
+          <h1 class="lib-title">Readily <span style="font-size:11px;font-weight:600;opacity:0.6;padding:2px 6px;border-radius:4px;background:var(--paper-soft);border:1px solid var(--line);vertical-align:middle;">v2.8</span></h1>
           <button class="streak-pill" id="lib-streak-btn" title="Ver racha y calendario de lectura">
             ${ic('flame', 18, 'fire')}
             <span>${st.current} día${st.current !== 1 ? 's' : ''}</span>
@@ -28,6 +28,7 @@ export function renderLibrary(container) {
             ${ic('plus', 16)} Subir PDF
             <input type="file" id="lib-file-input" accept="application/pdf" multiple style="display:none">
           </label>
+          <button class="btn ghost small" id="lib-refresh-btn" title="Recargar app y limpiar caché">${ic('refresh', 18)}</button>
           <button class="btn ghost small" id="lib-settings-btn" title="Ajustes de cuenta e IA">${ic('gear', 18)}</button>
           <button class="btn ghost small" id="lib-logout-btn" title="${isLocalSession() ? 'Salir del modo local' : 'Cerrar sesión'}">${ic('logout', 18)}</button>
         </div>
@@ -61,6 +62,20 @@ export function renderLibrary(container) {
   $('#lib-streak-btn', container).onclick = openStreakPanel;
   $('#lib-settings-btn', container).onclick = openSettingsModal;
   $('#lib-logout-btn', container).onclick = confirmSignOut;
+  $('#lib-refresh-btn', container).onclick = async () => {
+    toast('Limpiando caché y recargando...', { emoji: '🔄' });
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const r of regs) await r.unregister();
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        for (const k of keys) await caches.delete(k);
+      }
+    } catch (_) {}
+    location.reload(true);
+  };
 
   $$('.cat-chip', container).forEach(chip => {
     chip.onclick = () => {
