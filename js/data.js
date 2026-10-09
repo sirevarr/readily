@@ -185,7 +185,25 @@ export async function loadDocuments() {
 
 export async function refreshOfflineSet() {
   const ks = await idb.keys('blobs');
-  state.offlineDocs = new Set(ks);
+  const validSet = new Set();
+  for (const k of ks) {
+    try {
+      const val = await idb.get(k, 'blobs');
+      let len = 0;
+      if (val instanceof Blob) len = val.size;
+      else if (val instanceof ArrayBuffer) len = val.byteLength;
+      else if (val?.buffer instanceof ArrayBuffer) len = val.byteLength || val.buffer.byteLength;
+
+      if (len > 100) {
+        validSet.add(k);
+      } else {
+        await idb.del(k, 'blobs');
+      }
+    } catch (_) {
+      await idb.del(k, 'blobs');
+    }
+  }
+  state.offlineDocs = validSet;
 }
 
 export async function saveProgress(docId, page, maxPage) {
@@ -208,15 +226,26 @@ function withTimeout(promise, ms = 6000, errorMsg = 'Tiempo de espera agotado') 
 
 export async function getPdfBytes(doc, { onStatus } = {}) {
   if (!doc || !doc.storage_path) throw new Error('El libro no contiene una ruta de archivo válida.');
+  
   const cached = await idb.get(doc.storage_path, 'blobs');
   if (cached) {
-    onStatus?.('Desde tu dispositivo…');
-    if (cached instanceof Blob) return await cached.arrayBuffer();
-    if (cached instanceof ArrayBuffer) return cached.slice(0);
-    if (cached.buffer instanceof ArrayBuffer) {
-      return cached.buffer.slice(cached.byteOffset || 0, (cached.byteOffset || 0) + (cached.byteLength || cached.buffer.byteLength));
+    let buf = null;
+    try {
+      if (cached instanceof Blob) buf = await cached.arrayBuffer();
+      else if (cached instanceof ArrayBuffer) buf = cached.slice(0);
+      else if (cached?.buffer instanceof ArrayBuffer) {
+        buf = cached.buffer.slice(cached.byteOffset || 0, (cached.byteOffset || 0) + (cached.byteLength || cached.buffer.byteLength));
+      }
+    } catch (_) {}
+
+    if (buf && buf.byteLength > 100) {
+      onStatus?.('Desde tu dispositivo…');
+      return buf;
     }
-    return cached;
+
+    // Si la caché local es inválida, se elimina automáticamente
+    await idb.del(doc.storage_path, 'blobs');
+    state.offlineDocs.delete(doc.storage_path);
   }
 
   if (!state.sb || !navigator.onLine) throw new Error('Este libro todavía no está guardado en el dispositivo para leer offline.');
@@ -245,6 +274,11 @@ export async function getPdfBytes(doc, { onStatus } = {}) {
       }
     }
   }
+
+  if (!buf || buf.byteLength < 100) {
+    throw new Error(`El archivo descargado para "${doc.title}" está dañado o vacío.`);
+  }
+
   await idb.set(doc.storage_path, buf.slice(0), 'blobs');
   state.offlineDocs.add(doc.storage_path);
   return buf;

@@ -86,9 +86,8 @@ export function renderLibrary(container) {
       try {
         await openDocument(docId);
       } finally {
-        if (openBtn && state.view === 'library') {
-          openBtn.disabled = false;
-          openBtn.innerHTML = `Abrir ${ic('right', 14)}`;
+        if (state.view === 'library') {
+          renderLibrary(container);
         }
       }
     };
