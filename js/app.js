@@ -386,11 +386,16 @@ function renderReaderView(root) {
     </div>
   `;
 
-  renderToolbar($('#reader-tb', root));
-  mountSidebar($('#reader-sidebar', root));
+  try { renderToolbar($('#reader-tb', root)); } catch (err) { console.error('Error al renderizar toolbar:', err); }
+  try { mountSidebar($('#reader-sidebar', root)); } catch (err) { console.error('Error al montar barra lateral:', err); }
 
   const stage = $('#reader-stage', root);
-  V.mount(stage, state.pdf, state.pageNum);
+  if (stage && state.pdf) {
+    V.mount(stage, state.pdf, state.pageNum).catch(err => {
+      console.error('Error al visualizar páginas del PDF:', err);
+      toast(`Error al mostrar el PDF: ${err.message}`, { emoji: '⚠️', duration: 5000 });
+    });
+  }
 
   const updateDockUI = () => {
     const ps = $('#dock-page-str', root);

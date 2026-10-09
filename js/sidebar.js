@@ -26,10 +26,10 @@ export function mountSidebar(parent) {
 export function renderSidebar() {
   if (!container) return;
   const tab = state.sidebarTab || 'highlights';
-  const hlCount = state.highlights.length;
-  const fcCount = state.flashcards.length;
-  const glCount = state.glossary.length;
-  const qzCount = state.quizzes.length;
+  const hlCount = (state.highlights || []).length;
+  const fcCount = (state.flashcards || []).length;
+  const glCount = (state.glossary || []).length;
+  const qzCount = (state.quizzes || []).length;
 
   container.innerHTML = `
     <div class="sidebar-header">

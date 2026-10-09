@@ -1,5 +1,5 @@
 /* Readily v2 — Service Worker con soporte offline completo */
-const CACHE_NAME = 'readily-v2.6';
+const CACHE_NAME = 'readily-v2.7';
 const SHELL_ASSETS = [
   '/',
   '/index.html',

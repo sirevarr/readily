@@ -31,8 +31,13 @@ export async function mount(container, pdfDoc, startPage = 1, savedZoom = 'fit-w
   pagesEl = viewer.firstElementChild;
   zoomMode = savedZoom === 'fit-page' ? 'fit-page' : (typeof savedZoom === 'number' ? 'custom' : 'fit-width');
 
-  const first = await pdf.getPage(1);
-  const v1 = first.getViewport({ scale: 1 });
+  let v1 = { width: 612, height: 792 };
+  try {
+    const first = await pdf.getPage(1);
+    v1 = first.getViewport({ scale: 1 });
+  } catch (pgErr) {
+    console.warn('[viewer] no se pudo leer viewport de pág 1:', pgErr);
+  }
   pages = [];
   const frag = document.createDocumentFragment();
   for (let i = 1; i <= pdf.numPages; i++) {

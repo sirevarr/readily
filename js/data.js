@@ -170,7 +170,8 @@ export async function loadDocuments() {
     const docs = await fetchCached(ck('docs'), () => state.sb.from('documents').select('*').order('created_at', { ascending: false }));
     state.documents = docs || [];
   } else {
-    state.documents = (await idb.get(ck('docs'))) || [];
+    const localDocs = (await idb.get(ck('docs'))) || (await idb.get('readily_docs')) || [];
+    state.documents = localDocs;
   }
   const ids = state.documents.map(d => d.id);
   let progs = [];
