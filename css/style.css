@@ -1329,3 +1329,61 @@ textarea.input {
     display: none;
   }
 }
+
+/* ============================================================
+   MODALES Y DIÁLOGOS
+   ============================================================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(31, 29, 26, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.modal-overlay.out {
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+.modal-card {
+  background: var(--paper-card, #FFFFFF);
+  color: var(--ink, #1F1D1A);
+  border-radius: var(--r-xl, 18px);
+  padding: 26px 28px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.32), 0 4px 16px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--line, rgba(0, 0, 0, 0.08));
+  animation: modalScaleUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 14px;
+  color: var(--ink, #1F1D1A);
+}
+.modal-text {
+  font-size: 13.5px;
+  color: var(--ink-soft, #555);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 22px;
+}
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes modalScaleUp {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}

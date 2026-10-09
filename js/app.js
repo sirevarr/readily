@@ -304,6 +304,9 @@ export async function openDocument(docId) {
 
 async function promptLocalPdfFallback(doc, errorMsg) {
   return new Promise((resolve) => {
+    let done = false;
+    const finish = (val) => { if (!done) { done = true; resolve(val); } };
+
     const m = openModal(`
       <div class="modal-title" style="color:var(--warn);">⚠️ No se pudo descargar el PDF remoto</div>
       <p style="font-size:13px; color:var(--ink-soft); line-height:1.5; margin-bottom:14px;">
@@ -321,7 +324,8 @@ async function promptLocalPdfFallback(doc, errorMsg) {
       </div>
     `);
 
-    $('#fb-cancel', m.el).onclick = () => { m.close(); resolve(null); };
+    m.overlay.addEventListener('mousedown', (e) => { if (e.target === m.overlay) { m.close(); finish(null); } });
+    $('#fb-cancel', m.el).onclick = () => { m.close(); finish(null); };
     $('#fb-confirm', m.el).onclick = async () => {
       const fileInp = $('#fallback-pdf-file', m.el);
       const file = fileInp?.files?.[0];
@@ -333,11 +337,11 @@ async function promptLocalPdfFallback(doc, errorMsg) {
         state.offlineDocs.add(doc.storage_path);
         toast('PDF guardado en el dispositivo', { emoji: '✅' });
         m.close();
-        resolve(buf);
+        finish(buf);
       } catch (e) {
         toast(`Error al leer archivo: ${e.message}`, { emoji: '⚠️' });
         m.close();
-        resolve(null);
+        finish(null);
       }
     };
   });

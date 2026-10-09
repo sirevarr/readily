@@ -186,41 +186,56 @@ async function handleUploadFiles(files, container) {
       const buf = await f.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
 
-      // Guardar inmediatamente en IndexedDB local
       const { idb } = await import('./idb.js');
       await idb.set(path, buf.slice(0), 'blobs');
       state.offlineDocs.add(path);
 
-      const row = {
-        title: f.name.replace(/\.pdf$/i, ''),
-        storage_path: path,
-        num_pages: pdf.numPages,
-        user_id: userId(),
-        category: 'Sin categoría',
-        created_at: new Date().toISOString()
-      };
+      const localId = 'loc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+      const isLocal = isLocalSession();
+      const realUserId = isLocal ? null : userId();
 
-      if (state.sb) {
-        try {
-          await state.sb.storage.from('pdfs').upload(path, f);
-        } catch (stErr) {
-          console.warn('[upload] aviso almacenamiento remoto:', stErr);
+      let createdDoc = null;
+      if (state.sb && !isLocal && realUserId) {
+        const row = {
+          title: f.name.replace(/\.pdf$/i, ''),
+          storage_path: path,
+          num_pages: pdf.numPages,
+          user_id: realUserId,
+          category: 'Sin categoría'
+        };
+
+        const { error: upErr } = await state.sb.storage.from('pdfs').upload(path, f);
+        if (upErr) {
+          console.error('[storage] error al subir:', upErr);
+          toast(`Supabase Storage: ${upErr.message}`, { emoji: '⚠️', duration: 4000 });
         }
+
         const { data, error: dbErr } = await state.sb.from('documents').insert(row).select().single();
-        if (!dbErr && data) {
-          state.documents.unshift(data);
-        } else {
-          row.id = 'loc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
-          state.documents.unshift(row);
-          await idb.set('readily_docs', state.documents);
+        if (dbErr) {
+          console.error('[db] error al insertar:', dbErr);
+          toast(`Supabase DB: ${dbErr.message}`, { emoji: '⚠️', duration: 4000 });
+        } else if (data) {
+          createdDoc = data;
         }
-      } else {
-        row.id = 'loc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
-        state.documents.unshift(row);
-        await idb.set('readily_docs', state.documents);
+      }
+
+      if (!createdDoc) {
+        createdDoc = {
+          id: localId,
+          title: f.name.replace(/\.pdf$/i, ''),
+          storage_path: path,
+          num_pages: pdf.numPages,
+          user_id: 'local-user',
+          category: 'Sin categoría',
+          created_at: new Date().toISOString()
+        };
+        const curLocal = (await idb.get('readily_docs')) || [];
+        curLocal.unshift(createdDoc);
+        await idb.set('readily_docs', curLocal);
       }
     } catch (err) {
-      toast(`Error al subir ${f.name}: ${err.message}`, { emoji: '⚠️' });
+      console.error('[upload] error procesando archivo:', err);
+      toast(`Error al procesar ${f.name}: ${err.message}`, { emoji: '⚠️', duration: 5000 });
     }
   }
 

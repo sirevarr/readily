@@ -165,14 +165,20 @@ export function installSyncListeners() {
 
 /* ---------- Biblioteca ---------- */
 export async function loadDocuments() {
-  if (state.sb) {
+  const isLocal = !state.session || !!state.session.local || state.session?.user?.id === 'local-user';
+  let remoteDocs = [];
+  if (state.sb && !isLocal) {
     await flushBeforeLoad();
-    const docs = await fetchCached(ck('docs'), () => state.sb.from('documents').select('*').order('created_at', { ascending: false }));
-    state.documents = docs || [];
-  } else {
-    const localDocs = (await idb.get(ck('docs'))) || (await idb.get('readily_docs')) || [];
-    state.documents = localDocs;
+    remoteDocs = (await fetchCached(ck('docs'), () => state.sb.from('documents').select('*').order('created_at', { ascending: false }))) || [];
   }
+  const localDocs = (await idb.get('readily_docs')) || (await idb.get(ck('docs'))) || [];
+  const combined = [...remoteDocs];
+  localDocs.forEach(ld => {
+    if (!combined.some(d => String(d.id) === String(ld.id))) {
+      combined.push(ld);
+    }
+  });
+  state.documents = combined;
   const ids = state.documents.map(d => d.id);
   let progs = [];
   if (ids.length) {
