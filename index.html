@@ -51,13 +51,17 @@
     }
     // Configurar worker local de pdf.js
     if (window.pdfjsLib) {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
+      try {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('vendor/pdf.worker.min.js', window.location.href).href;
+      } catch (_) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
+      }
     }
   </script>
 
   <!-- Módulo de la aplicación v2 con sello de versión -->
   <script type="module">
-    import { initApp } from './js/app.js?v=2.2';
+    import { initApp } from './js/app.js?v=2.3';
     window.addEventListener('DOMContentLoaded', () => {
       initApp(document.getElementById('app-root'));
     });

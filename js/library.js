@@ -74,7 +74,7 @@ export function renderLibrary(container) {
 
   $$('.doc-card', container).forEach(card => {
     const docId = card.dataset.id;
-    const doc = state.documents.find(d => d.id === docId);
+    const doc = state.documents.find(d => String(d.id) === String(docId));
     if (!doc) return;
 
     const openBtn = card.querySelector('.doc-act-open');
@@ -156,31 +156,48 @@ async function handleUploadFiles(files, container) {
     const f = files[i];
     prog.textContent = `Subiendo ${i + 1}/${files.length}: ${f.name}...`;
 
-    // Sanitización estricta de nombres para Supabase Storage
     const safeName = f.name
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-zA-Z0-9._-]/g, '_');
     const path = `${userId()}/${Date.now()}_${safeName}`;
 
     try {
-      const { error } = await state.sb.storage.from('pdfs').upload(path, f);
-      if (error) throw error;
-
       const buf = await f.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+
+      // Guardar inmediatamente en IndexedDB local
+      const { idb } = await import('./idb.js');
+      await idb.set(path, buf.slice(0), 'blobs');
+      state.offlineDocs.add(path);
 
       const row = {
         title: f.name.replace(/\.pdf$/i, ''),
         storage_path: path,
         num_pages: pdf.numPages,
         user_id: userId(),
-        category: 'Sin categoría'
+        category: 'Sin categoría',
+        created_at: new Date().toISOString()
       };
 
-      const { data, error: dbErr } = await state.sb.from('documents').insert(row).select().single();
-      if (dbErr) throw dbErr;
-
-      state.documents.unshift(data);
+      if (state.sb) {
+        try {
+          await state.sb.storage.from('pdfs').upload(path, f);
+        } catch (stErr) {
+          console.warn('[upload] aviso almacenamiento remoto:', stErr);
+        }
+        const { data, error: dbErr } = await state.sb.from('documents').insert(row).select().single();
+        if (!dbErr && data) {
+          state.documents.unshift(data);
+        } else {
+          row.id = 'loc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+          state.documents.unshift(row);
+          await idb.set('readily_docs', state.documents);
+        }
+      } else {
+        row.id = 'loc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+        state.documents.unshift(row);
+        await idb.set('readily_docs', state.documents);
+      }
     } catch (err) {
       toast(`Error al subir ${f.name}: ${err.message}`, { emoji: '⚠️' });
     }

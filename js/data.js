@@ -202,7 +202,16 @@ export async function saveProgress(docId, page, maxPage) {
 export async function getPdfBytes(doc, { onStatus } = {}) {
   if (!doc || !doc.storage_path) throw new Error('El libro no contiene una ruta de archivo válida.');
   const cached = await idb.get(doc.storage_path, 'blobs');
-  if (cached) { onStatus?.('Desde tu dispositivo…'); return cached.slice(0); }
+  if (cached) {
+    onStatus?.('Desde tu dispositivo…');
+    if (cached instanceof Blob) return await cached.arrayBuffer();
+    if (cached instanceof ArrayBuffer) return cached.slice(0);
+    if (cached.buffer instanceof ArrayBuffer) {
+      return cached.buffer.slice(cached.byteOffset || 0, (cached.byteOffset || 0) + (cached.byteLength || cached.buffer.byteLength));
+    }
+    return cached;
+  }
+
   if (!state.sb || !navigator.onLine) throw new Error('Este libro todavía no está guardado en el dispositivo para leer offline.');
   onStatus?.('Descargando…');
   let buf;
@@ -217,8 +226,16 @@ export async function getPdfBytes(doc, { onStatus } = {}) {
       const res = await fetch(signed.signedUrl);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       buf = await res.arrayBuffer();
-    } catch (_) {
-      throw new Error(`No se pudo descargar "${doc.title}". El archivo no fue encontrado en Supabase Storage.`);
+    } catch (_2) {
+      try {
+        const { data: pub } = state.sb.storage.from('pdfs').getPublicUrl(doc.storage_path);
+        if (!pub?.publicUrl) throw new Error('URL pública no disponible');
+        const res = await fetch(pub.publicUrl);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        buf = await res.arrayBuffer();
+      } catch (_3) {
+        throw new Error(`No se pudo descargar "${doc.title}". El archivo no fue encontrado en Supabase Storage.`);
+      }
     }
   }
   await idb.set(doc.storage_path, buf.slice(0), 'blobs');

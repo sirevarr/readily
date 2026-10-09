@@ -228,7 +228,13 @@ export async function openDocument(docId) {
       }
     }
 
-    state.pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+    const bytes = buf instanceof Uint8Array ? buf : (buf?.buffer ? new Uint8Array(buf.buffer, buf.byteOffset || 0, buf.byteLength || buf.buffer.byteLength) : new Uint8Array(buf));
+    try {
+      state.pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+    } catch (wErr) {
+      console.warn('[pdf] fallback a modo sin worker:', wErr);
+      state.pdf = await pdfjsLib.getDocument({ data: bytes, disableWorker: true }).promise;
+    }
     state.numPages = state.pdf.numPages;
 
     if (state.sb) {
