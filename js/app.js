@@ -16,32 +16,63 @@ import { STYLE_BLOCK } from './config.js';
 
 let appRoot = null;
 
+const LOCAL_FLAG = 'readily_local_mode';
+const LOCAL_SESSION = () => ({ user: { id: 'local-user', email: 'local@device' }, local: true });
+
+export const isLocalSession = () => !!state.session?.local || state.session?.user?.id === 'local-user';
+
+/* Entrada explícita al modo local (sin cuenta). Se recuerda hasta que cierres sesión. */
+export async function enterLocalMode() {
+  localStorage.setItem(LOCAL_FLAG, '1');
+  state.session = LOCAL_SESSION();
+  state.view = 'library';
+  await loadDays();
+  await loadDocuments();
+  render();
+}
+
+/* Cerrar sesión: sale de la cuenta (o del modo local) y vuelve a la pantalla de acceso. */
+export async function signOut() {
+  try { V.unmount(); } catch (_) {}
+  try { await state.sb?.auth.signOut(); } catch (_) {}
+  localStorage.removeItem(LOCAL_FLAG);
+  localStorage.removeItem(LS.user);
+  state.session = null;
+  state.documents = [];
+  state.docProgresses = {};
+  state.currentDoc = null;
+  state.pdf = null;
+  state.authMode = 'login';
+  state.view = (localStorage.getItem(LS.sbUrl) && localStorage.getItem(LS.sbKey)) ? 'auth' : 'connect';
+  render();
+  toast('Sesión cerrada', { emoji: '👋' });
+}
+
 export async function initApp(rootElement) {
   appRoot = rootElement;
   installSyncListeners();
 
   const url = localStorage.getItem(LS.sbUrl);
   const key = localStorage.getItem(LS.sbKey);
+  const wantsLocal = !!localStorage.getItem(LOCAL_FLAG);
 
   if (url && key) {
     createClient(url, key);
-    try {
-      const session = await getSessionSafe();
-      if (session) {
-        state.session = session;
-      } else {
-        state.session = { user: { id: 'local-user', email: 'local@device' } };
-      }
-    } catch (_) {
-      state.session = { user: { id: 'local-user', email: 'local@device' } };
-    }
-  } else {
-    state.session = { user: { id: 'local-user', email: 'local@device' } };
+    let session = null;
+    try { session = await getSessionSafe(); } catch (_) {}
+    if (session) state.session = session;
+    else if (wantsLocal) state.session = LOCAL_SESSION();
+  } else if (wantsLocal) {
+    state.session = LOCAL_SESSION();
   }
 
-  state.view = 'library';
-  await loadDays();
-  await loadDocuments();
+  if (state.session) {
+    state.view = 'library';
+    await loadDays();
+    await loadDocuments();
+  } else {
+    state.view = (url && key) ? 'auth' : 'connect';
+  }
   render();
 }
 
@@ -101,13 +132,7 @@ function renderConnect(root) {
     render();
   };
 
-  $('#local-btn', root).onclick = async () => {
-    state.session = { user: { id: 'local-user', email: 'local@device' } };
-    state.view = 'library';
-    await loadDays();
-    await loadDocuments();
-    render();
-  };
+  $('#local-btn', root).onclick = () => enterLocalMode();
 }
 
 /* ==================== 2. AUTENTICACIÓN ==================== */
@@ -141,13 +166,7 @@ function renderAuth(root) {
     renderAuth(root);
   };
 
-  $('#local-mode-btn', root).onclick = async () => {
-    state.session = { user: { id: 'local-user', email: 'local@device' } };
-    state.view = 'library';
-    await loadDays();
-    await loadDocuments();
-    render();
-  };
+  $('#local-mode-btn', root).onclick = () => enterLocalMode();
 
   $('#auth-btn', root).onclick = async () => {
     const email = $('#auth-email', root).value.trim();
@@ -173,12 +192,8 @@ function renderAuth(root) {
       await loadDocuments();
       render();
     } catch (err) {
-      toast(`No se pudo autenticar: ${err.message}. Entrando en Modo Lectura Local.`, { emoji: '⚠️', duration: 4000 });
-      state.session = { user: { id: 'local-user', email: 'local@device' } };
-      state.view = 'library';
-      await loadDays();
-      await loadDocuments();
-      render();
+      const offline = !navigator.onLine || /fetch|network/i.test(err.message || '');
+      toast(offline ? 'Sin conexión con el servidor. Puedes usar el Modo Lectura Local.' : `No se pudo entrar: ${err.message}`, { emoji: '⚠️', duration: 4000 });
     }
   };
 }

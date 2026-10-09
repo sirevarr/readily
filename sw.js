@@ -1,5 +1,5 @@
 /* Readily v2 — Service Worker con soporte offline completo */
-const CACHE_NAME = 'readily-v2.1';
+const CACHE_NAME = 'readily-v2.2';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -51,17 +51,16 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Recursos estáticos locales (JS, CSS, vendor, imágenes): cache-first con revalidación
+  // Recursos estáticos locales (JS, CSS, vendor, imágenes): red primero, caché como respaldo sin conexión
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
-      return fetch(event.request).then(res => {
+    fetch(event.request)
+      .then(res => {
         if (res.ok) {
           const clone = res.clone();
           caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
         }
         return res;
-      });
-    })
+      })
+      .catch(() => caches.match(event.request))
   );
 });

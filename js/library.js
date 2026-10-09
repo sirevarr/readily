@@ -4,7 +4,7 @@ import { esc, ic, $, $$, openModal, confirmBox, askText, toast } from './util.js
 import { CATEGORIES, CATEGORY_EMOJI } from './config.js';
 import { loadDocuments, downloadForOffline, removeOffline, mutate, dbDelete, snap } from './data.js';
 import { openStreakPanel, stats } from './streak.js';
-import { openDocument } from './app.js';
+import { openDocument, signOut, isLocalSession } from './app.js';
 
 export function renderLibrary(container) {
   const st = stats();
@@ -29,6 +29,7 @@ export function renderLibrary(container) {
             <input type="file" id="lib-file-input" accept="application/pdf" multiple style="display:none">
           </label>
           <button class="btn ghost small" id="lib-settings-btn" title="Ajustes de cuenta e IA">${ic('gear', 18)}</button>
+          <button class="btn ghost small" id="lib-logout-btn" title="${isLocalSession() ? 'Salir del modo local' : 'Cerrar sesión'}">${ic('logout', 18)}</button>
         </div>
       </header>
 
@@ -59,6 +60,7 @@ export function renderLibrary(container) {
   // Handlers
   $('#lib-streak-btn', container).onclick = openStreakPanel;
   $('#lib-settings-btn', container).onclick = openSettingsModal;
+  $('#lib-logout-btn', container).onclick = confirmSignOut;
 
   $$('.cat-chip', container).forEach(chip => {
     chip.onclick = () => {
@@ -273,10 +275,36 @@ async function toggleOfflineBook(doc, container) {
   renderLibrary(container);
 }
 
+async function confirmSignOut() {
+  const local = isLocalSession();
+  const ok = await confirmBox({
+    title: local ? '¿Salir del modo local?' : '¿Cerrar sesión?',
+    message: local
+      ? 'Volverás a la pantalla de acceso. Tus libros guardados en este dispositivo no se borran.'
+      : 'Volverás a la pantalla de acceso. Tus libros guardados en el dispositivo no se borran.',
+    okLabel: local ? 'Salir' : 'Cerrar sesión',
+  });
+  if (ok) signOut();
+}
+
 function openSettingsModal() {
   const key = state.geminiKey || '';
+  const local = isLocalSession();
+  const email = state.session?.user?.email || '';
   const m = openModal(`
-    <div class="modal-title">Ajustes & Clave Gemini IA</div>
+    <div class="modal-title">Ajustes</div>
+
+    <div class="field">
+      <label>Cuenta</label>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--paper)">
+        <div style="min-width:0">
+          <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${local ? 'Modo local' : esc(email || 'Sesión iniciada')}</div>
+          <div style="font-size:11.5px;color:var(--ink-soft)">${local ? 'Sin cuenta · solo en este dispositivo' : 'Sincronizado con tu cuenta'}</div>
+        </div>
+        <button class="btn ghost small" id="set-logout">${ic('logout', 16)} ${local ? 'Salir' : 'Cerrar sesión'}</button>
+      </div>
+    </div>
+
     <div class="field">
       <label>Clave API de Gemini</label>
       <input id="set-key" class="input" type="password" value="${esc(key)}" placeholder="AIzaSy...">
@@ -291,6 +319,7 @@ function openSettingsModal() {
   `);
 
   $('#set-close', m.el).onclick = () => m.close();
+  $('#set-logout', m.el).onclick = () => { m.close(); confirmSignOut(); };
   $('#set-save', m.el).onclick = () => {
     const val = $('#set-key', m.el).value.trim();
     state.geminiKey = val;

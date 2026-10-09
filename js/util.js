@@ -86,6 +86,7 @@ const PATHS = {
   sync:    '<path d="M21 12a9 9 0 01-15.5 6.2M3 12a9 9 0 0115.5-6.2M18 3v4h-4M6 21v-4h4"/>',
   note:    '<path d="M5 3h14v18l-4-3-3 3-3-3-4 3z"/><path d="M9 8h6M9 12h4"/>',
   home:    '<path d="M3 11l9-8 9 8M5 10v10h14V10"/>',
+  logout:  '<path d="M9 4H5a2 2 0 00-2 2v12a2 2 0 002 2h4M16 8l4 4-4 4M20 12H9"/>',
 };
 export function ic(name, size = 20, extra = '') {
   return `<svg class="ic ${extra}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PATHS[name] || ''}</svg>`;
