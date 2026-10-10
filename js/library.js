@@ -17,7 +17,7 @@ export function renderLibrary(container) {
     <div class="lib-container">
       <header class="lib-header">
         <div class="lib-brand">
-          <h1 class="lib-title">Readily <span style="font-size:11px;font-weight:600;opacity:0.6;padding:2px 6px;border-radius:4px;background:var(--paper-soft);border:1px solid var(--line);vertical-align:middle;">v2.8</span></h1>
+          <h1 class="lib-title">Readily <span style="font-size:11px;font-weight:600;opacity:0.6;padding:2px 6px;border-radius:4px;background:var(--paper-soft);border:1px solid var(--line);vertical-align:middle;">v2.9</span></h1>
           <button class="streak-pill" id="lib-streak-btn" title="Ver racha y calendario de lectura">
             ${ic('flame', 18, 'fire')}
             <span>${st.current} día${st.current !== 1 ? 's' : ''}</span>
@@ -87,6 +87,7 @@ export function renderLibrary(container) {
   const fileInp = $('#lib-file-input', container);
   fileInp.onchange = (e) => handleUploadFiles(e.target.files, container);
 
+  let isOpeningDoc = false;
   $$('.doc-card', container).forEach(card => {
     const docId = card.dataset.id;
     const doc = state.documents.find(d => String(d.id) === String(docId));
@@ -94,6 +95,8 @@ export function renderLibrary(container) {
 
     const openBtn = card.querySelector('.doc-act-open');
     const triggerOpen = async () => {
+      if (isOpeningDoc) return;
+      isOpeningDoc = true;
       if (openBtn) {
         openBtn.disabled = true;
         openBtn.innerHTML = `<div class="spinner sm" style="width:12px;height:12px;border-width:2px;"></div> Abriendo...`;
@@ -101,6 +104,7 @@ export function renderLibrary(container) {
       try {
         await openDocument(docId);
       } finally {
+        isOpeningDoc = false;
         if (state.view === 'library') {
           renderLibrary(container);
         }

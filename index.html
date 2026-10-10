@@ -12,12 +12,12 @@
   <meta name="apple-mobile-web-app-title" content="Readily">
   <link rel="apple-touch-icon" href="icon-192.png">
 
-  <!-- Limpieza ÚNICA de la caché vieja de la v1/v2 (forzada para v2.8) -->
+  <!-- Limpieza ÚNICA de la caché vieja de la v1/v2 (forzada para v2.9) -->
   <script>
     (async function purgeStaleCachesOnce() {
       try {
-        if (localStorage.getItem('readily_v2_8_purged')) return;
-        localStorage.setItem('readily_v2_8_purged', '1');
+        if (localStorage.getItem('readily_v2_9_purged')) return;
+        localStorage.setItem('readily_v2_9_purged', '1');
         if ('serviceWorker' in navigator) {
           const regs = await navigator.serviceWorker.getRegistrations();
           for (const r of regs) await r.unregister();
@@ -32,7 +32,7 @@
   </script>
 
   <!-- Estilos de Readily v2 -->
-  <link rel="stylesheet" href="css/style.css?v=2.8">
+  <link rel="stylesheet" href="css/style.css?v=2.9">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -56,13 +56,13 @@
       window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
     }
     if (window.pdfjsLib) {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
     }
   </script>
 
   <!-- Módulo de la aplicación v2 con sello de versión -->
   <script type="module">
-    import { initApp } from './js/app.js?v=2.8';
+    import { initApp } from './js/app.js?v=2.9';
     window.addEventListener('DOMContentLoaded', () => {
       initApp(document.getElementById('app-root'));
     });

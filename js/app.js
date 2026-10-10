@@ -285,7 +285,12 @@ export async function openDocument(docId) {
     extractIndexInBackground();
 
     // Cargar outline (TOC)
-    try { state.tocEntries = (await state.pdf.getOutline()) || []; } catch (_) { state.tocEntries = []; }
+    try {
+      state.tocEntries = (await Promise.race([
+        state.pdf.getOutline(),
+        new Promise(r => setTimeout(() => r([]), 1500))
+      ])) || [];
+    } catch (_) { state.tocEntries = []; }
 
     state.view = 'reader';
     render();
